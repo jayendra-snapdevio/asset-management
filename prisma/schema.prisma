@@ -1,0 +1,106 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+// Enums
+enum Role {
+  OWNER
+  ADMIN
+  USER
+}
+
+enum AssetStatus {
+  AVAILABLE
+  ASSIGNED
+  UNDER_MAINTENANCE
+  RETIRED
+}
+
+enum AssignmentStatus {
+  ACTIVE
+  RETURNED
+  TRANSFERRED
+}
+
+// Models
+model User {
+  id               String       @id @default(auto()) @map("_id") @db.ObjectId
+  email            String       @unique
+  password         String
+  firstName        String
+  lastName         String
+  role             Role         @default(USER)
+  isActive         Boolean      @default(true)
+  companyId        String?      @db.ObjectId
+  company          Company?     @relation(fields: [companyId], references: [id])
+  createdAssets    Asset[]      @relation("CreatedBy")
+  assignments      Assignment[]
+  resetToken       String?
+  resetTokenExpiry DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+}
+
+model Company {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String   @unique
+  address     String?
+  phone       String?
+  email       String?
+  website     String?
+  description String?
+  isActive    Boolean  @default(true)
+  ownerId     String   @db.ObjectId
+  users       User[]
+  assets      Asset[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Asset {
+  id            String       @id @default(auto()) @map("_id") @db.ObjectId
+  name          String
+  description   String?
+  serialNumber  String?      @unique
+  model         String?
+  manufacturer  String?
+  purchaseDate  DateTime?
+  purchasePrice Float?
+  currentValue  Float?
+  location      String?
+  status        AssetStatus  @default(AVAILABLE)
+  category      String?
+  tags          String[]
+  imageUrl      String?
+  qrCode        String?
+  companyId     String       @db.ObjectId
+  company       Company      @relation(fields: [companyId], references: [id])
+  createdById   String       @db.ObjectId
+  createdBy     User         @relation("CreatedBy", fields: [createdById], references: [id])
+  assignments   Assignment[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+model Assignment {
+  id           String           @id @default(auto()) @map("_id") @db.ObjectId
+  assetId      String           @db.ObjectId
+  asset        Asset            @relation(fields: [assetId], references: [id])
+  userId       String           @db.ObjectId
+  user         User             @relation(fields: [userId], references: [id])
+  assignedDate DateTime         @default(now())
+  returnDate   DateTime?
+  dueDate      DateTime?
+  notes        String?
+  status       AssignmentStatus @default(ACTIVE)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+}
