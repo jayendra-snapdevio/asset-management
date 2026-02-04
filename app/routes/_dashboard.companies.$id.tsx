@@ -1,0 +1,386 @@
+import { useState } from "react";
+import { data, redirect, Form, Link, useNavigation } from "react-router";
+import type { Route } from "./+types/_dashboard.companies.$id";
+import { requireRole } from "~/lib/session.server";
+import { getCompanyById, updateCompany, deleteCompany } from "~/services/company.service.server";
+import { updateCompanySchema } from "~/validators/company.validator";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
+import { Button } from "~/components/ui/button";
+import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "~/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "~/components/ui/table";
+import { Badge } from "~/components/ui/badge";
+import { Separator } from "~/components/ui/separator";
+import {
+  Building2,
+  ArrowLeft,
+  Save,
+  Trash2,
+  Users,
+  Package,
+  Mail,
+  Phone,
+  MapPin,
+  Globe,
+  UserPlus,
+  Shield,
+  User,
+} from "lucide-react";
+import { formatDate } from "~/lib/date";
+
+type CompanyUser = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: string;
+  createdAt: Date;
+};
+
+export function meta({ data }: Route.MetaArgs) {
+  const companyName = data?.company?.name || "Company";
+  return [{ title: `${companyName} - Asset Management` }];
+}
+
+export async function loader({ request, params }: Route.LoaderArgs) {
+  const user = await requireRole(request, ["OWNER"]);
+
+  const company = await getCompanyById(params.id, user.id);
+
+  if (!company) {
+    throw redirect("/unauthorized");
+  }
+
+  return { user, company };
+}
+
+export async function action({ request, params }: Route.ActionArgs) {
+  const user = await requireRole(request, ["OWNER"]);
+  const formData = await request.formData();
+  const intent = formData.get("intent");
+
+  if (intent === "update") {
+    const rawData = Object.fromEntries(formData);
+    rawData.id = params.id;
+
+    const result = updateCompanySchema.safeParse(rawData);
+    if (!result.success) {
+      return data(
+        { errors: result.error.flatten().fieldErrors, success: false },
+        { status: 400 }
+      );
+    }
+
+    const updated = await updateCompany(params.id, user.id, result.data);
+    if (!updated) {
+      return data({ error: "Company not found", success: false }, { status: 404 });
+    }
+
+    return data({ success: true, message: "Company updated successfully" });
+  }
+
+  if (intent === "delete") {
+    const deleted = await deleteCompany(params.id, user.id);
+    if (!deleted) {
+      return data({ error: "Company not found", success: false }, { status: 404 });
+    }
+
+    return redirect("/dashboard/companies");
+  }
+
+  return null;
+}
+
+export default function CompanyDetailPage({
+  loaderData,
+  actionData,
+}: Route.ComponentProps) {
+  const { company } = loaderData;
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const navigation = useNavigation();
+  const isSubmitting = navigation.state === "submitting";
+
+  const getRoleBadge = (role: string) => {
+    switch (role) {
+      case "ADMIN":
+        return (
+          <Badge variant="default" className="gap-1">
+            <Shield className="h-3 w-3" />
+            Admin
+          </Badge>
+        );
+      case "USER":
+        return (
+          <Badge variant="secondary" className="gap-1">
+            <User className="h-3 w-3" />
+            User
+          </Badge>
+        );
+      default:
+        return <Badge variant="outline">{role}</Badge>;
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button asChild variant="ghost" size="sm">
+            <Link to="/dashboard/companies">
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              Back
+            </Link>
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold flex items-center gap-2">
+              <Building2 className="h-8 w-8" />
+              {company.name}
+            </h1>
+            <p className="text-muted-foreground">Manage company details and users</p>
+          </div>
+        </div>
+
+        <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <DialogTrigger asChild>
+            <Button variant="destructive">
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete Company
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete Company</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete "{company.name}"? This action will
+                deactivate the company and all associated data. This cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setIsDeleteDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Form method="post">
+                <input type="hidden" name="intent" value="delete" />
+                <Button type="submit" variant="destructive" disabled={isSubmitting}>
+                  {isSubmitting ? "Deleting..." : "Delete Company"}
+                </Button>
+              </Form>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{company._count.users}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Assets</CardTitle>
+            <Package className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{company._count.assets}</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Company Details Form */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Company Details</CardTitle>
+          <CardDescription>Update company information</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {actionData && "success" in actionData && actionData.success && (
+            <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded mb-4">
+              {"message" in actionData ? actionData.message : "Company updated successfully!"}
+            </div>
+          )}
+          {actionData && "error" in actionData && actionData.error && (
+            <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded mb-4">
+              {actionData.error}
+            </div>
+          )}
+
+          <Form method="post" className="space-y-4">
+            <input type="hidden" name="intent" value="update" />
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="name">
+                  <Building2 className="h-4 w-4 inline mr-1" />
+                  Company Name *
+                </Label>
+                <Input
+                  id="name"
+                  name="name"
+                  defaultValue={company.name}
+                  required
+                />
+                {actionData && "errors" in actionData && actionData.errors?.name && (
+                  <p className="text-sm text-destructive">{actionData.errors.name[0]}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="email">
+                  <Mail className="h-4 w-4 inline mr-1" />
+                  Email
+                </Label>
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  defaultValue={company.email || ""}
+                />
+                {actionData && "errors" in actionData && actionData.errors?.email && (
+                  <p className="text-sm text-destructive">{actionData.errors.email[0]}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="phone">
+                  <Phone className="h-4 w-4 inline mr-1" />
+                  Phone
+                </Label>
+                <Input
+                  id="phone"
+                  name="phone"
+                  defaultValue={company.phone || ""}
+                />
+                {actionData && "errors" in actionData && actionData.errors?.phone && (
+                  <p className="text-sm text-destructive">{actionData.errors.phone[0]}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="website">
+                  <Globe className="h-4 w-4 inline mr-1" />
+                  Website
+                </Label>
+                <Input
+                  id="website"
+                  name="website"
+                  type="url"
+                  defaultValue={company.website || ""}
+                />
+                {actionData && "errors" in actionData && actionData.errors?.website && (
+                  <p className="text-sm text-destructive">{actionData.errors.website[0]}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="address">
+                <MapPin className="h-4 w-4 inline mr-1" />
+                Address
+              </Label>
+              <Input
+                id="address"
+                name="address"
+                defaultValue={company.address || ""}
+              />
+            </div>
+
+            <div className="flex justify-end">
+              <Button type="submit" disabled={isSubmitting}>
+                <Save className="h-4 w-4 mr-2" />
+                {isSubmitting ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
+          </Form>
+        </CardContent>
+      </Card>
+
+      {/* Users List */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Company Users</CardTitle>
+            <CardDescription>
+              Users assigned to this company
+            </CardDescription>
+          </div>
+          <Button asChild>
+            <Link to={`/dashboard/companies/${company.id}/admins`}>
+              <UserPlus className="h-4 w-4 mr-2" />
+              Manage Admins
+            </Link>
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {company.users.length === 0 ? (
+            <div className="text-center py-8">
+              <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground">No users in this company yet.</p>
+              <Button asChild className="mt-4" variant="outline">
+                <Link to={`/dashboard/companies/${company.id}/admins`}>
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Add Users
+                </Link>
+              </Button>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Joined</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(company.users as CompanyUser[]).map((user) => (
+                  <TableRow key={user.id}>
+                    <TableCell className="font-medium">
+                      {user.firstName} {user.lastName}
+                    </TableCell>
+                    <TableCell>{user.email}</TableCell>
+                    <TableCell>{getRoleBadge(user.role)}</TableCell>
+                    <TableCell>
+                      {formatDate(user.createdAt)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
