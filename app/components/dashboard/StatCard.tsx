@@ -9,6 +9,7 @@ import {
   TrendingUp,
   TrendingDown,
 } from "lucide-react";
+import { Link } from "react-router";
 
 const icons = {
   Package,
@@ -28,6 +29,7 @@ interface StatCardProps {
   description?: string;
   trend?: { value: number; isPositive: boolean };
   className?: string;
+  path?: string;
 }
 
 export function StatCard({
@@ -37,13 +39,20 @@ export function StatCard({
   description,
   trend,
   className,
+  path,
 }: StatCardProps) {
   const Icon = icons[icon];
 
   return (
     <Card className={className}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+        {path ? (
+          <Link to={path} className="hover:underline">
+            <CardTitle className="text-sm font-medium">{title}</CardTitle>
+          </Link>
+        ) : (
+          <CardTitle className="text-sm font-medium">{title}</CardTitle>
+        )}
         <Icon className="h-4 w-4 text-muted-foreground" />
       </CardHeader>
       <CardContent>

@@ -30,6 +30,12 @@ enum AssignmentStatus {
   TRANSFERRED
 }
 
+enum OwnershipType {
+  COMPANY
+  PRIVATE
+  OTHER
+}
+
 // Models
 model User {
   id               String       @id @default(auto()) @map("_id") @db.ObjectId
@@ -42,6 +48,7 @@ model User {
   companyId        String?      @db.ObjectId
   company          Company?     @relation(fields: [companyId], references: [id])
   createdAssets    Asset[]      @relation("CreatedBy")
+  ownedAssets      Asset[]      @relation("AssetOwner")
   assignments      Assignment[]
   resetToken       String?
   resetTokenExpiry DateTime?
@@ -66,28 +73,32 @@ model Company {
 }
 
 model Asset {
-  id            String       @id @default(auto()) @map("_id") @db.ObjectId
-  name          String
-  description   String?
-  serialNumber  String?      @unique
-  model         String?
-  manufacturer  String?
-  purchaseDate  DateTime?
-  purchasePrice Float?
-  currentValue  Float?
-  location      String?
-  status        AssetStatus  @default(AVAILABLE)
-  category      String?
-  tags          String[]
-  imageUrl      String?
-  qrCode        String?
-  companyId     String       @db.ObjectId
-  company       Company      @relation(fields: [companyId], references: [id])
-  createdById   String       @db.ObjectId
-  createdBy     User         @relation("CreatedBy", fields: [createdById], references: [id])
-  assignments   Assignment[]
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  id             String        @id @default(auto()) @map("_id") @db.ObjectId
+  name           String
+  description    String?
+  serialNumber   String?       @unique
+  model          String?
+  manufacturer   String?
+  purchaseDate   DateTime?
+  purchasePrice  Float?
+  currentValue   Float?
+  location       String?
+  status         AssetStatus   @default(AVAILABLE)
+  category       String?
+  tags           String[]
+  imageUrl       String?
+  qrCode         String?
+  ownershipType  OwnershipType @default(COMPANY)
+  companyId      String        @db.ObjectId
+  company        Company       @relation(fields: [companyId], references: [id])
+  createdById    String        @db.ObjectId
+  createdBy      User          @relation("CreatedBy", fields: [createdById], references: [id])
+  ownerId        String?       @db.ObjectId
+  owner          User?         @relation("AssetOwner", fields: [ownerId], references: [id])
+  otherOwnership String?
+  assignments    Assignment[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 }
 
 model Assignment {

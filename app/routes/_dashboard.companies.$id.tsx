@@ -12,8 +12,7 @@ import {
   CardTitle,
 } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
-import { Label } from "~/components/ui/label";
+import { FormField } from "~/components/forms/form-field";
 import {
   Dialog,
   DialogContent,
@@ -32,7 +31,6 @@ import {
   TableRow,
 } from "~/components/ui/table";
 import { Badge } from "~/components/ui/badge";
-import { Separator } from "~/components/ui/separator";
 import {
   Building2,
   ArrowLeft,
@@ -40,24 +38,13 @@ import {
   Trash2,
   Users,
   Package,
-  Mail,
-  Phone,
-  MapPin,
-  Globe,
   UserPlus,
   Shield,
   User,
 } from "lucide-react";
 import { formatDate } from "~/lib/date";
-
-type CompanyUser = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  role: string;
-  createdAt: Date;
-};
+import { SuccessMessage } from "~/components/ui/success-message";
+import type { CompanyDetail } from "~/types";
 
 export function meta({ data }: Route.MetaArgs) {
   const companyName = data?.company?.name || "Company";
@@ -118,6 +105,7 @@ export default function CompanyDetailPage({
   actionData,
 }: Route.ComponentProps) {
   const { company } = loaderData;
+  const typedCompany = company as CompanyDetail;
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
@@ -150,7 +138,6 @@ export default function CompanyDetailPage({
           <Button asChild variant="ghost" size="sm">
             <Link to="/dashboard/companies">
               <ArrowLeft className="h-4 w-4 mr-1" />
-              Back
             </Link>
           </Button>
           <div>
@@ -225,9 +212,13 @@ export default function CompanyDetailPage({
         </CardHeader>
         <CardContent>
           {actionData && "success" in actionData && actionData.success && (
-            <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded mb-4">
-              {"message" in actionData ? actionData.message : "Company updated successfully!"}
-            </div>
+            <SuccessMessage
+              message={
+                "message" in actionData
+                  ? actionData.message
+                  : "Company updated successfully!"
+              }
+            />
           )}
           {actionData && "error" in actionData && actionData.error && (
             <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded mb-4">
@@ -239,81 +230,43 @@ export default function CompanyDetailPage({
             <input type="hidden" name="intent" value="update" />
 
             <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="name">
-                  <Building2 className="h-4 w-4 inline mr-1" />
-                  Company Name *
-                </Label>
-                <Input
-                  id="name"
-                  name="name"
-                  defaultValue={company.name}
-                  required
-                />
-                {actionData && "errors" in actionData && actionData.errors?.name && (
-                  <p className="text-sm text-destructive">{actionData.errors.name[0]}</p>
-                )}
-              </div>
+              <FormField
+                label="Company Name"
+                name="name"
+                defaultValue={company.name}
+                required
+                error={actionData && "errors" in actionData ? actionData.errors?.name : undefined}
+              />
 
-              <div className="space-y-2">
-                <Label htmlFor="email">
-                  <Mail className="h-4 w-4 inline mr-1" />
-                  Email
-                </Label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  defaultValue={company.email || ""}
-                />
-                {actionData && "errors" in actionData && actionData.errors?.email && (
-                  <p className="text-sm text-destructive">{actionData.errors.email[0]}</p>
-                )}
-              </div>
+              <FormField
+                label="Email"
+                name="email"
+                type="email"
+                defaultValue={company.email || ""}
+                error={actionData && "errors" in actionData ? actionData.errors?.email : undefined}
+              />
 
-              <div className="space-y-2">
-                <Label htmlFor="phone">
-                  <Phone className="h-4 w-4 inline mr-1" />
-                  Phone
-                </Label>
-                <Input
-                  id="phone"
-                  name="phone"
-                  defaultValue={company.phone || ""}
-                />
-                {actionData && "errors" in actionData && actionData.errors?.phone && (
-                  <p className="text-sm text-destructive">{actionData.errors.phone[0]}</p>
-                )}
-              </div>
+              <FormField
+                label="Phone"
+                name="phone"
+                defaultValue={company.phone || ""}
+                error={actionData && "errors" in actionData ? actionData.errors?.phone : undefined}
+              />
 
-              <div className="space-y-2">
-                <Label htmlFor="website">
-                  <Globe className="h-4 w-4 inline mr-1" />
-                  Website
-                </Label>
-                <Input
-                  id="website"
-                  name="website"
-                  type="url"
-                  defaultValue={company.website || ""}
-                />
-                {actionData && "errors" in actionData && actionData.errors?.website && (
-                  <p className="text-sm text-destructive">{actionData.errors.website[0]}</p>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="address">
-                <MapPin className="h-4 w-4 inline mr-1" />
-                Address
-              </Label>
-              <Input
-                id="address"
-                name="address"
-                defaultValue={company.address || ""}
+              <FormField
+                label="Website"
+                name="website"
+                type="url"
+                defaultValue={company.website || ""}
+                error={actionData && "errors" in actionData ? actionData.errors?.website : undefined}
               />
             </div>
+
+            <FormField
+              label="Address"
+              name="address"
+              defaultValue={company.address || ""}
+            />
 
             <div className="flex justify-end">
               <Button type="submit" disabled={isSubmitting}>
@@ -364,7 +317,7 @@ export default function CompanyDetailPage({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(company.users as CompanyUser[]).map((user) => (
+                {typedCompany.users.map((user) => (
                   <TableRow key={user.id}>
                     <TableCell className="font-medium">
                       {user.firstName} {user.lastName}

@@ -1,8 +1,8 @@
-import { Link, useSearchParams } from "react-router";
+import { data, Form, Link, useNavigation, useSearchParams } from "react-router";
 import type { Route } from "./+types/_dashboard.assets";
 import { requireRole } from "~/lib/session.server";
 import { getCompanyFilter } from "~/services/company.service.server";
-import { getAssets } from "~/services/asset.service.server";
+import { getAssets, deleteAsset } from "~/services/asset.service.server";
 import type { AssetStatus } from "@prisma/client";
 import { Card, CardContent } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
@@ -22,38 +22,31 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "~/components/ui/dialog";
 import { Badge } from "~/components/ui/badge";
+import { Pagination } from "~/components/shared/Pagination";
 import {
   Package,
   Plus,
   Search,
   Eye,
-  ChevronLeft,
-  ChevronRight,
-  X,
   ArrowUpDown,
   User,
+  Edit2,
+  Trash2,
+  X,
 } from "lucide-react";
-import { ASSET_STATUS_LABELS, ASSET_STATUS_COLORS, ASSET_CATEGORIES } from "~/constants";
+import { ASSET_STATUS_LABELS, ASSET_STATUS_COLORS, ASSET_CATEGORIES, OWNERSHIP_TYPE_LABELS } from "~/constants";
 import { format } from "date-fns";
-
-type AssetListItem = {
-  id: string;
-  name: string;
-  description: string | null;
-  serialNumber: string | null;
-  category: string | null;
-  status: AssetStatus;
-  purchaseDate: Date | null;
-  purchasePrice: number | null;
-  createdAt: Date;
-  createdBy: { id: string; firstName: string; lastName: string; email: string } | null;
-  assignments: {
-    id: string;
-    status: string;
-    user: { id: string; firstName: string; lastName: string; email: string };
-  }[];
-};
+import type { AssetListItem } from "~/types";
 
 export function meta() {
   return [{ title: "Assets - Asset Management" }];
@@ -70,7 +63,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   const category = url.searchParams.get("category") || undefined;
   const sortBy = url.searchParams.get("sortBy") || "createdAt";
   const sortOrder = (url.searchParams.get("sortOrder") || "desc") as "asc" | "desc";
-  const limit = 10;
+  const limit = parseInt(url.searchParams.get("limit") || "10");
 
   const { assets, categories, pagination } = await getAssets(companyFilter, {
     page,
@@ -80,6 +73,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     category,
     sortBy,
     sortOrder,
+    userId: user.role === "USER" ? user.id : undefined,
   });
 
   return {
@@ -91,12 +85,41 @@ export async function loader({ request }: Route.LoaderArgs) {
   };
 }
 
-export default function AssetsPage({ loaderData }: Route.ComponentProps) {
+export async function action({ request }: Route.ActionArgs) {
+  const user = await requireRole(request, ["OWNER", "ADMIN"]);
+  const companyFilter = await getCompanyFilter(user);
+  const formData = await request.formData();
+  const intent = formData.get("intent");
+
+  if (intent === "delete") {
+    const assetId = formData.get("assetId") as string;
+    if (!assetId) {
+      return data({ error: "Asset ID is required", success: false }, { status: 400 });
+    }
+    
+    try {
+      const result = await deleteAsset(assetId, companyFilter);
+      if (result.error) {
+        return data({ error: result.error, success: false }, { status: 400 });
+      }
+      return data({ success: true, message: "Asset retired successfully" });
+    } catch (error) {
+      console.error("Delete asset error:", error);
+      return data({ error: "Failed to delete asset", success: false }, { status: 500 });
+    }
+  }
+
+  return null;
+}
+
+export default function AssetsPage({ loaderData, actionData }: Route.ComponentProps) {
   const { user, assets, categories, pagination, filters } = loaderData;
+  const navigation = useNavigation();
+  const isSubmitting = navigation.state === "submitting";
   const [searchParams, setSearchParams] = useSearchParams();
   const canManageAssets = user.role === "OWNER" || user.role === "ADMIN";
 
-  const typedAssets = assets as AssetListItem[];
+  const typedAssets = assets as unknown as AssetListItem[];
 
   const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -156,6 +179,16 @@ export default function AssetsPage({ loaderData }: Route.ComponentProps) {
 
   return (
     <div className="space-y-6">
+      {actionData && "error" in actionData && actionData.error && (
+        <div className="bg-destructive/15 border border-destructive text-destructive px-4 py-3 rounded-md">
+          {actionData.error}
+        </div>
+      )}
+      {actionData && "success" in actionData && actionData.success && (
+        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-md">
+          {"message" in actionData ? actionData.message : "Action completed successfully"}
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Assets</h1>
@@ -163,14 +196,12 @@ export default function AssetsPage({ loaderData }: Route.ComponentProps) {
             Manage your organization's assets
           </p>
         </div>
-        {canManageAssets && (
-          <Link to="/dashboard/assets/new">
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Asset
-            </Button>
-          </Link>
-        )}
+        <Link to={canManageAssets ? "/dashboard/assets/new" : "/dashboard/user/assets/new"}>
+          <Button>
+            <Plus className="h-4 w-4" />
+            Add Asset
+          </Button>
+        </Link>
       </div>
 
       {/* Filters */}
@@ -282,6 +313,7 @@ export default function AssetsPage({ loaderData }: Route.ComponentProps) {
                   </TableHead>
                   <TableHead>Serial Number</TableHead>
                   <TableHead>Category</TableHead>
+                  <TableHead>Ownership</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Assigned To</TableHead>
                   <TableHead>
@@ -295,7 +327,7 @@ export default function AssetsPage({ loaderData }: Route.ComponentProps) {
                       <ArrowUpDown className="ml-2 h-4 w-4" />
                     </Button>
                   </TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -321,6 +353,27 @@ export default function AssetsPage({ loaderData }: Route.ComponentProps) {
                           <span className="text-muted-foreground">—</span>
                         )}
                       </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1 text-xs">
+                          {asset.ownershipType ? (
+                            <Badge variant="secondary" className="bg-slate-100 text-slate-800 w-fit">
+                              {OWNERSHIP_TYPE_LABELS[asset.ownershipType as keyof typeof OWNERSHIP_TYPE_LABELS] || asset.ownershipType}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                          {asset.ownershipType === "PRIVATE" && asset.owner && (
+                            <span className="text-muted-foreground">
+                              {asset.owner.firstName} {asset.owner.lastName}
+                            </span>
+                          )}
+                          {asset.ownershipType === "OTHER" && asset.otherOwnership && (
+                            <span className="text-muted-foreground truncate max-w-[120px]" title={asset.otherOwnership}>
+                              {asset.otherOwnership}
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell>{getStatusBadge(asset.status)}</TableCell>
                       <TableCell>
                         {activeAssignment ? (
@@ -339,11 +392,54 @@ export default function AssetsPage({ loaderData }: Route.ComponentProps) {
                         {format(new Date(asset.createdAt), "MMM d, yyyy")}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Link to={`/dashboard/assets/${asset.id}`}>
-                          <Button variant="ghost" size="sm">
-                            <Eye className="h-4 w-4" />
+                        <div className="flex justify-start gap-1">
+                          <Button asChild variant="ghost" size="icon" className="h-8 w-8" title="View details">
+                            <Link to={`/dashboard/assets/${asset.id}`}>
+                              <Eye className="h-3 w-3" />
+                            </Link>
                           </Button>
-                        </Link>
+                          
+                          {canManageAssets && (
+                            <>
+                              <Button asChild variant="ghost" size="icon" className="h-8 w-8" title="Edit asset">
+                                <Link to={`/dashboard/assets/${asset.id}`}>
+                                  <Edit2 className="h-3 w-3" />
+                                </Link>
+                              </Button>
+                              
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" title="Delete asset">
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                  <DialogHeader>
+                                    <DialogTitle>Delete Asset</DialogTitle>
+                                    <DialogDescription>
+                                      Are you sure you want to retire {asset.name}? This will set its status to RETIRED. 
+                                      {asset.status === "ASSIGNED" && " Note: This asset is currently assigned."}
+                                    </DialogDescription>
+                                  </DialogHeader>
+                                  <DialogFooter className="mt-4">
+                                    <Form method="post">
+                                      <input type="hidden" name="intent" value="delete" />
+                                      <input type="hidden" name="assetId" value={asset.id} />
+                                      <div className="flex gap-2 justify-end">
+                                        <DialogTrigger asChild>
+                                          <Button type="button" variant="outline">Cancel</Button>
+                                        </DialogTrigger>
+                                        <Button type="submit" variant="destructive" disabled={isSubmitting}>
+                                          {isSubmitting ? "Deleting..." : "Delete Asset"}
+                                        </Button>
+                                      </div>
+                                    </Form>
+                                  </DialogFooter>
+                                </DialogContent>
+                              </Dialog>
+                            </>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -352,39 +448,12 @@ export default function AssetsPage({ loaderData }: Route.ComponentProps) {
             </Table>
           </CardContent>
 
-          {/* Pagination */}
-          {pagination.totalPages > 1 && (
-            <div className="flex items-center justify-between px-6 py-4 border-t">
-              <p className="text-sm text-muted-foreground">
-                Showing {(pagination.page - 1) * pagination.limit + 1} to{" "}
-                {Math.min(pagination.page * pagination.limit, pagination.total)} of{" "}
-                {pagination.total} assets
-              </p>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => goToPage(pagination.page - 1)}
-                  disabled={pagination.page <= 1}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                  Previous
-                </Button>
-                <span className="text-sm text-muted-foreground">
-                  Page {pagination.page} of {pagination.totalPages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => goToPage(pagination.page + 1)}
-                  disabled={pagination.page >= pagination.totalPages}
-                >
-                  Next
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          )}
+          <Pagination
+            pagination={pagination}
+            onPageChange={goToPage}
+            onLimitChange={(value) => handleFilterChange("limit", value)}
+            itemName="assets"
+          />
         </Card>
       )}
     </div>

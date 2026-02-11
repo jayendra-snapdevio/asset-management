@@ -1,11 +1,26 @@
-import { Link, useSearchParams } from "react-router";
+import { data, Form, Link, useNavigation, useSearchParams } from "react-router";
 import type { Route } from "./+types/_dashboard.assignments";
 import { requireRole } from "~/lib/session.server";
 import { getCompanyFilter } from "~/services/company.service.server";
-import { getAssignments } from "~/services/assignment.service.server";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import { getAssignments, deleteAssignment } from "~/services/assignment.service.server";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "~/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -21,30 +36,71 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import { ClipboardList, Plus, Eye, ChevronLeft, ChevronRight, Search, X } from "lucide-react";
+import { Pagination } from "~/components/shared/Pagination";
+import {
+  ClipboardList,
+  Plus,
+  Eye,
+  Search,
+  X,
+  Edit2,
+  Trash2,
+} from "lucide-react";
 import type { AssignmentStatus } from "@prisma/client";
 import { Input } from "~/components/ui/input";
+import type { AssignmentListItem } from "~/types";
 
 export function meta() {
   return [{ title: "Assignments - Asset Management" }];
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const user = await requireRole(request, ["OWNER", "ADMIN"]);
+  const user = await requireRole(request, ["OWNER", "ADMIN", "USER"]);
   const companyFilter = await getCompanyFilter(user);
 
   const url = new URL(request.url);
   const status = url.searchParams.get("status") as AssignmentStatus | null;
   const page = parseInt(url.searchParams.get("page") || "1");
-  const limit = 10;
+  const limit = parseInt(url.searchParams.get("limit") || "10");
 
   const { assignments, pagination } = await getAssignments(
     companyFilter,
     { page, limit },
-    { status: status || undefined }
+    { 
+      status: status || undefined,
+      userId: user.role === "USER" ? user.id : undefined,
+    },
   );
 
-  return { user, assignments, pagination };
+  return { user, assignments,    pagination,
+  };
+}
+
+export async function action({ request }: Route.ActionArgs) {
+  const user = await requireRole(request, ["OWNER", "ADMIN"]);
+  const companyFilter = await getCompanyFilter(user);
+  const formData = await request.formData();
+  const intent = formData.get("intent");
+
+  if (intent === "delete") {
+    const assignmentId = formData.get("assignmentId") as string;
+    if (!assignmentId) {
+      return data({ error: "Assignment ID is required", success: false }, { status: 400 });
+    }
+    
+    try {
+      const result = await deleteAssignment(assignmentId, companyFilter);
+      if (result.error) {
+        return data({ error: result.error, success: false }, { status: 400 });
+      }
+      return data({ success: true, message: "Assignment deleted successfully" });
+    } catch (error) {
+      console.error("Delete assignment error:", error);
+      return data({ error: "Failed to delete assignment", success: false }, { status: 500 });
+    }
+  }
+
+  return null;
 }
 
 function getStatusBadge(status: AssignmentStatus) {
@@ -54,7 +110,9 @@ function getStatusBadge(status: AssignmentStatus) {
     case "RETURNED":
       return <Badge variant="secondary">Returned</Badge>;
     case "TRANSFERRED":
-      return <Badge className="bg-blue-500 hover:bg-blue-600">Transferred</Badge>;
+      return (
+        <Badge className="bg-blue-500 hover:bg-blue-600">Transferred</Badge>
+      );
     default:
       return <Badge variant="outline">{status}</Badge>;
   }
@@ -69,12 +127,18 @@ function formatDate(date: string | Date | null) {
   });
 }
 
-export default function AssignmentsPage({ loaderData }: Route.ComponentProps) {
-  const { assignments, pagination } = loaderData;
+export default function AssignmentsPage({ loaderData, actionData }: Route.ComponentProps) {
+  const { user, assignments, pagination } = loaderData;
+  const navigation = useNavigation();
+  const isSubmitting = navigation.state === "submitting";
+  const typedAssignments = assignments as AssignmentListItem[];
+  // ... existing state hooks ...
   const [searchParams, setSearchParams] = useSearchParams();
   const currentStatus = searchParams.get("status") || "";
   const currentSearch = searchParams.get("search") || "";
+  const canManageAssignments = user.role === "OWNER" || user.role === "ADMIN";
 
+  // ... handlers ...
   const handleSearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
@@ -115,12 +179,22 @@ export default function AssignmentsPage({ loaderData }: Route.ComponentProps) {
 
   return (
     <div className="space-y-6">
+      {actionData && "error" in actionData && actionData.error && (
+        <div className="bg-destructive/15 border border-destructive text-destructive px-4 py-3 rounded-md">
+          {actionData.error as string}
+        </div>
+      )}
+      {actionData && "success" in actionData && actionData.success && (
+        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-md">
+          {"message" in actionData ? (actionData.message as string) : "Action completed successfully"}
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Assignments</h1>
           <p className="text-muted-foreground">Manage asset assignments</p>
         </div>
-        <Link to="/dashboard/assignments/new">
+        <Link to={canManageAssignments ? "/dashboard/assignments/new" : "/dashboard/user/assignments/new"}>
           <Button>
             <Plus className="h-4 w-4 mr-2" />
             New Assignment
@@ -160,7 +234,10 @@ export default function AssignmentsPage({ loaderData }: Route.ComponentProps) {
 
             {/* Status Filter */}
             <div className="w-full sm:w-48">
-              <Select value={currentStatus || "all"} onValueChange={handleStatusChange}>
+              <Select
+                value={currentStatus || "all"}
+                onValueChange={handleStatusChange}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="All Statuses" />
                 </SelectTrigger>
@@ -177,11 +254,16 @@ export default function AssignmentsPage({ loaderData }: Route.ComponentProps) {
           {/* Active Filters Display */}
           {(currentSearch || currentStatus) && (
             <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t">
-              <span className="text-sm text-muted-foreground">Active filters:</span>
+              <span className="text-sm text-muted-foreground">
+                Active filters:
+              </span>
               {currentSearch && (
                 <Badge variant="secondary" className="gap-1">
                   Search: {currentSearch}
-                  <button onClick={clearSearch} className="ml-1 hover:text-destructive">
+                  <button
+                    onClick={clearSearch}
+                    className="ml-1 hover:text-destructive"
+                  >
                     <X className="h-3 w-3" />
                   </button>
                 </Badge>
@@ -189,8 +271,8 @@ export default function AssignmentsPage({ loaderData }: Route.ComponentProps) {
               {currentStatus && (
                 <Badge variant="secondary" className="gap-1">
                   Status: {currentStatus}
-                  <button 
-                    onClick={() => handleStatusChange("all")} 
+                  <button
+                    onClick={() => handleStatusChange("all")}
                     className="ml-1 hover:text-destructive"
                   >
                     <X className="h-3 w-3" />
@@ -237,7 +319,7 @@ export default function AssignmentsPage({ loaderData }: Route.ComponentProps) {
                   <TableHead>Status</TableHead>
                   <TableHead>Assigned Date</TableHead>
                   <TableHead>Return Date</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -245,7 +327,12 @@ export default function AssignmentsPage({ loaderData }: Route.ComponentProps) {
                   <TableRow key={assignment.id}>
                     <TableCell>
                       <div>
-                        <div className="font-medium">{assignment.asset.name}</div>
+                        <Link
+                          to={`/dashboard/assets/${assignment.asset.id}`}
+                          className="font-medium hover:underline"
+                        >
+                          {assignment.asset.name}
+                        </Link>
                         {assignment.asset.serialNumber && (
                           <div className="text-sm text-muted-foreground">
                             SN: {assignment.asset.serialNumber}
@@ -267,45 +354,73 @@ export default function AssignmentsPage({ loaderData }: Route.ComponentProps) {
                     <TableCell>{formatDate(assignment.assignedDate)}</TableCell>
                     <TableCell>{formatDate(assignment.returnDate)}</TableCell>
                     <TableCell className="text-right">
-                      <Link to={`/dashboard/assignments/${assignment.id}`}>
-                        <Button variant="ghost" size="sm">
-                          <Eye className="h-4 w-4" />
+                      <div className="flex justify-start gap-1">
+                        <Button asChild variant="ghost" size="icon" className="h-8 w-8" title="View details">
+                          <Link to={`/dashboard/assignments/${assignment.id}`}>
+                            <Eye className="h-3 w-3" />
+                          </Link>
                         </Button>
-                      </Link>
+                        
+                        {canManageAssignments && (
+                          <>
+                            <Button asChild variant="ghost" size="icon" className="h-8 w-8" title="Edit assignment">
+                              <Link to={`/dashboard/assignments/${assignment.id}`}>
+                                <Edit2 className="h-3 w-3" />
+                              </Link>
+                            </Button>
+                            
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" title="Delete assignment">
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent>
+                                <DialogHeader>
+                                  <DialogTitle>Delete Assignment</DialogTitle>
+                                  <DialogDescription>
+                                    Are you sure you want to delete this assignment for {assignment.asset.name}? 
+                                    {assignment.status === "ACTIVE" && " This will return the asset status to AVAILABLE."}
+                                    This action cannot be undone.
+                                  </DialogDescription>
+                                </DialogHeader>
+                                <DialogFooter className="mt-4">
+                                  <Form method="post">
+                                    <input type="hidden" name="intent" value="delete" />
+                                    <input type="hidden" name="assignmentId" value={assignment.id} />
+                                    <div className="flex gap-2 justify-end">
+                                      <DialogTrigger asChild>
+                                        <Button type="button" variant="outline">Cancel</Button>
+                                      </DialogTrigger>
+                                      <Button type="submit" variant="destructive" disabled={isSubmitting}>
+                                        {isSubmitting ? "Deleting..." : "Delete Assignment"}
+                                      </Button>
+                                    </div>
+                                  </Form>
+                                </DialogFooter>
+                              </DialogContent>
+                            </Dialog>
+                          </>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
 
-            {/* Pagination */}
-            {pagination.totalPages > 1 && (
-              <div className="flex items-center justify-between mt-4 pt-4 border-t">
-                <div className="text-sm text-muted-foreground">
-                  Page {pagination.page} of {pagination.totalPages}
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={pagination.page <= 1}
-                    onClick={() => handlePageChange(pagination.page - 1)}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                    Previous
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={pagination.page >= pagination.totalPages}
-                    onClick={() => handlePageChange(pagination.page + 1)}
-                  >
-                    Next
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            )}
+            <Pagination
+              pagination={pagination}
+              onPageChange={handlePageChange}
+              onLimitChange={(value) => {
+                const params = new URLSearchParams(searchParams);
+                params.set("limit", value);
+                params.set("page", "1");
+                setSearchParams(params);
+              }}
+              itemName="assignments"
+              className="mt-4"
+            />
           </CardContent>
         </Card>
       )}

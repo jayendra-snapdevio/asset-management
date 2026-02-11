@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { data, redirect, Form, Link, useNavigation } from "react-router";
 import type { Route } from "./+types/_dashboard.companies.$id.admins";
 import { requireRole } from "~/lib/session.server";
@@ -18,8 +18,7 @@ import {
   CardTitle,
 } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
-import { Label } from "~/components/ui/label";
+import { FormField } from "~/components/forms/form-field";
 import {
   Dialog,
   DialogContent,
@@ -48,6 +47,8 @@ import {
   Mail,
   Search,
 } from "lucide-react";
+import { PasswordToggleField } from "~/components/forms/password-input";
+import { SuccessMessage } from "~/components/ui/success-message";
 
 type CompanyUser = {
   id: string;
@@ -86,45 +87,73 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   return { user, company, availableUsers, search };
 }
 
+interface ActionResponse {
+  success: boolean;
+  message?: string;
+  error?: string;
+  errors?: Record<string, string[]>;
+}
+
 export async function action({ request, params }: Route.ActionArgs) {
   const user = await requireRole(request, ["OWNER"]);
   const formData = await request.formData();
   const intent = formData.get("intent");
 
   if (!params.id) {
-    return data({ error: "Company ID is required", success: false }, { status: 400 });
+    return data<ActionResponse>(
+      { error: "Company ID is required", success: false },
+      { status: 400 },
+    );
   }
 
   if (intent === "add-admin") {
     const email = formData.get("email") as string;
 
     if (!email) {
-      return data({ error: "Email is required", success: false }, { status: 400 });
+      return data<ActionResponse>(
+        { error: "Email is required", success: false },
+        { status: 400 },
+      );
     }
 
     const result = await addAdminToCompany(params.id, user.id, email);
 
     if (result.error) {
-      return data({ error: result.error, success: false }, { status: 400 });
+      return data<ActionResponse>(
+        { error: result.error, success: false },
+        { status: 400 },
+      );
     }
 
-    return data({ success: true, message: "Admin added successfully" });
+    return data<ActionResponse>({
+      success: true,
+      message: "Admin added successfully",
+    });
   }
 
   if (intent === "remove-admin") {
     const userId = formData.get("userId") as string;
 
     if (!userId) {
-      return data({ error: "User ID is required", success: false }, { status: 400 });
+      return data<ActionResponse>(
+        { error: "User ID is required", success: false },
+        { status: 400 },
+      );
     }
 
     const result = await removeAdminFromCompany(params.id, user.id, userId);
 
     if (result.error) {
-      return data({ error: result.error, success: false }, { status: 400 });
+      return data<ActionResponse>(
+        { error: result.error, success: false },
+        { status: 400 },
+      );
     }
 
-    return data({ success: true, message: "Admin removed successfully" });
+    return data<ActionResponse>({
+      success: true,
+      message: "Admin removed successfully",
+    });
   }
 
   if (intent === "create-admin") {
@@ -133,12 +162,21 @@ export async function action({ request, params }: Route.ActionArgs) {
     const firstName = formData.get("firstName") as string;
     const lastName = formData.get("lastName") as string;
 
-    if (!email || !password || !firstName || !lastName) {
-      return data({ error: "All fields are required", success: false }, { status: 400 });
+    const errors: Record<string, string[]> = {};
+    if (!email) errors.email = ["Email is required"];
+    if (!password) {
+      errors.password = ["Password is required"];
+    } else if (password.length < 8) {
+      errors.password = ["Password must be at least 8 characters"];
     }
+    if (!firstName) errors.firstName = ["First name is required"];
+    if (!lastName) errors.lastName = ["Last name is required"];
 
-    if (password.length < 8) {
-      return data({ error: "Password must be at least 8 characters", success: false }, { status: 400 });
+    if (Object.keys(errors).length > 0) {
+      return data<ActionResponse>(
+        { errors, success: false, error: "Please correct the errors below" },
+        { status: 400 },
+      );
     }
 
     // Verify the owner owns this company
@@ -147,7 +185,10 @@ export async function action({ request, params }: Route.ActionArgs) {
     });
 
     if (!company) {
-      return data({ error: "Company not found or unauthorized", success: false }, { status: 403 });
+      return data<ActionResponse>(
+        { error: "Company not found or unauthorized", success: false },
+        { status: 403 },
+      );
     }
 
     // Check if email already exists
@@ -156,7 +197,14 @@ export async function action({ request, params }: Route.ActionArgs) {
     });
 
     if (existingUser) {
-      return data({ error: "A user with this email already exists", success: false }, { status: 400 });
+      return data<ActionResponse>(
+        {
+          error: "A user with this email already exists",
+          success: false,
+          errors: { email: ["This email is already taken"] },
+        },
+        { status: 400 },
+      );
     }
 
     // Create the new admin user
@@ -173,7 +221,10 @@ export async function action({ request, params }: Route.ActionArgs) {
       },
     });
 
-    return data({ success: true, message: "New admin created successfully" });
+    return data<ActionResponse>({
+      success: true,
+      message: "New admin created successfully",
+    });
   }
 
   return null;
@@ -184,12 +235,20 @@ export default function CompanyAdminsPage({
   actionData,
 }: Route.ComponentProps) {
   const { company, availableUsers, search } = loaderData;
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [selectedEmail, setSelectedEmail] = useState("");
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
 
+  // Close create dialog and clear selection on succes
+  useEffect(() => {
+    if (actionData?.success) {
+      setIsCreateDialogOpen(false);
+      setSelectedEmail("");
+    }
+  }, [actionData]);
+
+const errors = actionData?.errors as Record<string, string[]> | undefined;
   const users = company.users as CompanyUser[];
   const admins = users.filter((u) => u.role === "ADMIN");
   const regularUsers = users.filter((u) => u.role === "USER");
@@ -218,28 +277,32 @@ export default function CompanyAdminsPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button asChild variant="ghost" size="sm">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+        <Button asChild variant="ghost" size="sm" className="w-fit">
           <Link to={`/dashboard/companies/${company.id}`}>
             <ArrowLeft className="h-4 w-4 mr-1" />
             Back to Company
           </Link>
         </Button>
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Building2 className="h-8 w-8" />
-            {company.name} - Manage Admins
+          <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
+            <Building2 className="h-6 w-6 sm:h-8 sm:w-8" />
+            <span className="truncate">{company.name}</span>
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-sm sm:text-base text-muted-foreground">
             Add or remove administrators for this company
           </p>
         </div>
       </div>
 
       {actionData && "success" in actionData && actionData.success && (
-        <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded">
-          {"message" in actionData ? actionData.message : "Operation completed successfully!"}
-        </div>
+        <SuccessMessage
+          message={
+            "message" in actionData
+              ? actionData.message
+              : "Operation completed successfully!"
+          }
+        />
       )}
       {actionData && "error" in actionData && actionData.error && (
         <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded">
@@ -261,24 +324,18 @@ export default function CompanyAdminsPage({
         <CardContent>
           <Form method="post" className="space-y-4">
             <input type="hidden" name="intent" value="add-admin" />
-            <div className="flex gap-4">
-              <div className="flex-1 space-y-2">
-                <Label htmlFor="email">
-                  <Mail className="h-4 w-4 inline mr-1" />
-                  User Email
-                </Label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  placeholder="Enter user email address"
-                  value={selectedEmail}
-                  onChange={(e) => setSelectedEmail(e.target.value)}
-                  required
-                />
-              </div>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <FormField
+                label="User Email"
+                name="email"
+                type="email"
+                placeholder="Enter user email address"
+                value={selectedEmail}
+                onChange={(e) => setSelectedEmail(e.target.value)}
+                required
+              />
               <div className="flex items-end">
-                <Button type="submit" disabled={isSubmitting || !selectedEmail}>
+                <Button type="submit" className="w-full sm:w-auto" disabled={isSubmitting || !selectedEmail}>
                   <UserPlus className="h-4 w-4 mr-2" />
                   {isSubmitting ? "Adding..." : "Add Admin"}
                 </Button>
@@ -329,27 +386,32 @@ export default function CompanyAdminsPage({
                 </DialogHeader>
                 <Form method="post" className="space-y-4">
                   <input type="hidden" name="intent" value="create-admin" />
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="create-firstName">First Name *</Label>
-                      <Input id="create-firstName" name="firstName" required />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="create-lastName">Last Name *</Label>
-                      <Input id="create-lastName" name="lastName" required />
-                    </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <FormField
+                      label="First Name"
+                      name="firstName"
+                      required
+                      error={errors?.firstName}
+                    />
+                    <FormField
+                      label="Last Name"
+                      name="lastName"
+                      required
+                      error={errors?.lastName}
+                    />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="create-email">Email *</Label>
-                    <Input id="create-email" name="email" type="email" required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="create-password">Password *</Label>
-                    <Input id="create-password" name="password" type="password" required minLength={8} />
-                    <p className="text-xs text-muted-foreground">
-                      Must be at least 8 characters
-                    </p>
-                  </div>
+                  <FormField
+                    label="Email"
+                    name="email"
+                    type="email"
+                    required
+                    error={errors?.email}
+                  />
+                    <PasswordToggleField
+                      name="password"
+                      label="Password"
+                      errors={errors?.password}
+                    />
                   <DialogFooter>
                     <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                       Cancel
@@ -383,7 +445,8 @@ export default function CompanyAdminsPage({
               <p className="text-muted-foreground">No administrators yet.</p>
             </div>
           ) : (
-            <Table>
+            <div className="overflow-x-auto">
+              <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
@@ -419,6 +482,7 @@ export default function CompanyAdminsPage({
                 ))}
               </TableBody>
             </Table>
+          </div>
           )}
         </CardContent>
       </Card>
@@ -436,26 +500,28 @@ export default function CompanyAdminsPage({
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {regularUsers.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell className="font-medium">
-                      {user.firstName} {user.lastName}
-                    </TableCell>
-                    <TableCell>{user.email}</TableCell>
-                    <TableCell>{getRoleBadge(user.role)}</TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Role</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {regularUsers.map((user) => (
+                    <TableRow key={user.id}>
+                      <TableCell className="font-medium whitespace-nowrap">
+                        {user.firstName} {user.lastName}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">{user.email}</TableCell>
+                      <TableCell>{getRoleBadge(user.role)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </CardContent>
         </Card>
       )}

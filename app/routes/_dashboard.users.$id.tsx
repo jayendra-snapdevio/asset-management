@@ -7,6 +7,7 @@ import {
   updateUser,
   toggleUserStatus,
   resetUserPassword,
+  deleteUser,
 } from "~/services/user.service.server";
 import { updateUserSchema } from "~/validators/user.validator";
 import {
@@ -17,8 +18,8 @@ import {
   CardTitle,
 } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
-import { Label } from "~/components/ui/label";
+import { FormField } from "~/components/forms/form-field";
+import { FormSelect } from "~/components/forms/form-select";
 import {
   Dialog,
   DialogContent,
@@ -29,13 +30,6 @@ import {
   DialogTrigger,
 } from "~/components/ui/dialog";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "~/components/ui/select";
-import {
   Table,
   TableBody,
   TableCell,
@@ -44,7 +38,6 @@ import {
   TableRow,
 } from "~/components/ui/table";
 import { Badge } from "~/components/ui/badge";
-import { Separator } from "~/components/ui/separator";
 import { formatDuration } from "~/lib/utils";
 import {
   ArrowLeft,
@@ -62,36 +55,13 @@ import {
   UserCheck,
 } from "lucide-react";
 import { formatDate } from "~/lib/date";
-
-type UserAssignment = {
-  id: string;
-  assignedDate: Date;
-  returnDate: Date | null;
-  status: string;
-  notes: string | null;
-  asset: {
-    id: string;
-    name: string;
-    serialNumber: string | null;
-    status: string;
-  };
-};
-
-type UserDetail = {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  role: string;
-  isActive: boolean;
-  createdAt: Date;
-  companyId: string | null;
-  company: { id: string; name: string } | null;
-  assignments: UserAssignment[];
-};
+import { SuccessMessage } from "~/components/ui/success-message";
+import type { UserDetail } from "~/types";
 
 export function meta({ data }: Route.MetaArgs) {
-  const userName = data?.user ? `${data.user.firstName} ${data.user.lastName}` : "User";
+  const userName = data?.user
+    ? `${data.user.firstName} ${data.user.lastName}`
+    : "User";
   return [{ title: `${userName} - Asset Management` }];
 }
 
@@ -120,7 +90,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     if (!result.success) {
       return data(
         { errors: result.error.flatten().fieldErrors, success: false },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -132,7 +102,10 @@ export async function action({ request, params }: Route.ActionArgs) {
     });
 
     if (updateResult.error) {
-      return data({ error: updateResult.error, success: false }, { status: 400 });
+      return data(
+        { error: updateResult.error, success: false },
+        { status: 400 },
+      );
     }
 
     return data({ success: true, message: "User updated successfully" });
@@ -142,7 +115,10 @@ export async function action({ request, params }: Route.ActionArgs) {
     const toggleResult = await toggleUserStatus(params.id, currentUser);
 
     if (toggleResult.error) {
-      return data({ error: toggleResult.error, success: false }, { status: 400 });
+      return data(
+        { error: toggleResult.error, success: false },
+        { status: 400 },
+      );
     }
 
     return data({
@@ -159,17 +135,37 @@ export async function action({ request, params }: Route.ActionArgs) {
     if (!newPassword || newPassword.length < 8) {
       return data(
         { error: "Password must be at least 8 characters", success: false },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    const resetResult = await resetUserPassword(params.id, newPassword, currentUser);
+    const resetResult = await resetUserPassword(
+      params.id,
+      newPassword,
+      currentUser,
+    );
 
     if (resetResult.error) {
-      return data({ error: resetResult.error, success: false }, { status: 400 });
+      return data(
+        { error: resetResult.error, success: false },
+        { status: 400 },
+      );
     }
 
     return data({ success: true, message: "Password reset successfully" });
+  }
+
+  if (intent === "delete") {
+    const deleteResult = await deleteUser(params.id, currentUser);
+
+    if (deleteResult.error) {
+      return data(
+        { error: deleteResult.error, success: false },
+        { status: 400 },
+      );
+    }
+
+    return redirect("/dashboard/users");
   }
 
   return null;
@@ -182,11 +178,16 @@ export default function UserDetailPage({
   const { currentUser, user } = loaderData;
   const typedUser = user as UserDetail;
   const [isResetPasswordOpen, setIsResetPasswordOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
 
-  const activeAssignments = typedUser.assignments.filter((a) => a.status === "ACTIVE");
-  const pastAssignments = typedUser.assignments.filter((a) => a.status !== "ACTIVE");
+  const activeAssignments = typedUser.assignments.filter(
+    (a) => a.status === "ACTIVE",
+  );
+  const pastAssignments = typedUser.assignments.filter(
+    (a) => a.status !== "ACTIVE",
+  );
 
   const getRoleBadge = (role: string) => {
     switch (role) {
@@ -229,7 +230,8 @@ export default function UserDetailPage({
     }
   };
 
-  const canModify = currentUser.role === "OWNER" || 
+  const canModify =
+    currentUser.role === "OWNER" ||
     (currentUser.role === "ADMIN" && typedUser.role !== "OWNER");
   const isSelf = currentUser.id === typedUser.id;
 
@@ -240,7 +242,6 @@ export default function UserDetailPage({
           <Button asChild variant="ghost" size="sm">
             <Link to="/dashboard/users">
               <ArrowLeft className="h-4 w-4 mr-1" />
-              Back
             </Link>
           </Button>
           <div>
@@ -252,12 +253,18 @@ export default function UserDetailPage({
               {typedUser.email}
               {getRoleBadge(typedUser.role)}
               {typedUser.isActive ? (
-                <Badge variant="outline" className="text-green-600 border-green-600">
+                <Badge
+                  variant="outline"
+                  className="text-green-600 border-green-600"
+                >
                   <CheckCircle className="h-3 w-3 mr-1" />
                   Active
                 </Badge>
               ) : (
-                <Badge variant="outline" className="text-red-600 border-red-600">
+                <Badge
+                  variant="outline"
+                  className="text-red-600 border-red-600"
+                >
                   <XCircle className="h-3 w-3 mr-1" />
                   Inactive
                 </Badge>
@@ -269,7 +276,10 @@ export default function UserDetailPage({
         <div className="flex gap-2">
           {canModify && !isSelf && (
             <>
-              <Dialog open={isResetPasswordOpen} onOpenChange={setIsResetPasswordOpen}>
+              <Dialog
+                open={isResetPasswordOpen}
+                onOpenChange={setIsResetPasswordOpen}
+              >
                 <DialogTrigger asChild>
                   <Button variant="outline">
                     <KeyRound className="h-4 w-4 mr-2" />
@@ -277,29 +287,27 @@ export default function UserDetailPage({
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
-                  <Form method="post" onSubmit={() => setIsResetPasswordOpen(false)}>
+                  <Form
+                    method="post"
+                    onSubmit={() => setIsResetPasswordOpen(false)}
+                  >
                     <input type="hidden" name="intent" value="reset-password" />
                     <DialogHeader>
                       <DialogTitle>Reset Password</DialogTitle>
                       <DialogDescription>
-                        Set a new password for {typedUser.firstName} {typedUser.lastName}.
+                        Set a new password for {typedUser.firstName}{" "}
+                        {typedUser.lastName}.
                       </DialogDescription>
                     </DialogHeader>
                     <div className="py-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="newPassword">New Password</Label>
-                        <Input
-                          id="newPassword"
-                          name="newPassword"
-                          type="password"
-                          placeholder="Enter new password"
-                          required
-                          minLength={8}
-                        />
-                        <p className="text-sm text-muted-foreground">
-                          Minimum 8 characters
-                        </p>
-                      </div>
+                      <FormField
+                        label="New Password"
+                        name="newPassword"
+                        type="password"
+                        placeholder="Enter new password"
+                        required
+                        helperText="Minimum 8 characters"
+                      />
                     </div>
                     <DialogFooter>
                       <Button
@@ -337,15 +345,52 @@ export default function UserDetailPage({
                   )}
                 </Button>
               </Form>
+
+              <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="destructive">
+                    <UserX className="h-4 w-4 mr-2" />
+                    Delete User
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Delete User</DialogTitle>
+                    <DialogDescription>
+                      Are you sure you want to delete {typedUser.firstName}{" "}
+                      {typedUser.lastName}? This action cannot be undone.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <Form method="post" onSubmit={() => setIsDeleteDialogOpen(false)}>
+                    <input type="hidden" name="intent" value="delete" />
+                    <DialogFooter>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsDeleteDialogOpen(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button type="submit" variant="destructive" disabled={isSubmitting}>
+                        {isSubmitting ? "Deleting..." : "Delete User"}
+                      </Button>
+                    </DialogFooter>
+                  </Form>
+                </DialogContent>
+              </Dialog>
             </>
           )}
         </div>
       </div>
 
       {actionData && "success" in actionData && actionData.success && (
-        <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded">
-          {"message" in actionData ? actionData.message : "Operation completed successfully!"}
-        </div>
+        <SuccessMessage
+          message={
+            "message" in actionData
+              ? actionData.message
+              : "Operation completed successfully!"
+          }
+        />
       )}
       {actionData && "error" in actionData && actionData.error && (
         <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded">
@@ -357,7 +402,9 @@ export default function UserDetailPage({
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Assignments</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Active Assignments
+            </CardTitle>
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -366,11 +413,15 @@ export default function UserDetailPage({
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Assignments</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Total Assignments
+            </CardTitle>
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{typedUser.assignments.length}</div>
+            <div className="text-2xl font-bold">
+              {typedUser.assignments.length}
+            </div>
           </CardContent>
         </Card>
         <Card>
@@ -399,75 +450,50 @@ export default function UserDetailPage({
             <input type="hidden" name="intent" value="update" />
 
             <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="firstName">First Name</Label>
-                <Input
-                  id="firstName"
-                  name="firstName"
-                  defaultValue={typedUser.firstName}
-                  disabled={!canModify}
-                />
-                {actionData && "errors" in actionData && actionData.errors?.firstName && (
-                  <p className="text-sm text-destructive">{actionData.errors.firstName[0]}</p>
-                )}
-              </div>
+              <FormField
+                label="First Name"
+                name="firstName"
+                defaultValue={typedUser.firstName}
+                disabled={!canModify}
+                error={actionData && "errors" in actionData ? actionData.errors?.firstName : undefined}
+              />
 
-              <div className="space-y-2">
-                <Label htmlFor="lastName">Last Name</Label>
-                <Input
-                  id="lastName"
-                  name="lastName"
-                  defaultValue={typedUser.lastName}
-                  disabled={!canModify}
-                />
-                {actionData && "errors" in actionData && actionData.errors?.lastName && (
-                  <p className="text-sm text-destructive">{actionData.errors.lastName[0]}</p>
-                )}
-              </div>
+              <FormField
+                label="Last Name"
+                name="lastName"
+                defaultValue={typedUser.lastName}
+                disabled={!canModify}
+                error={actionData && "errors" in actionData ? actionData.errors?.lastName : undefined}
+              />
 
-              <div className="space-y-2">
-                <Label htmlFor="email">
-                  <Mail className="h-4 w-4 inline mr-1" />
-                  Email
-                </Label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  defaultValue={typedUser.email}
-                  disabled={!canModify}
-                />
-                {actionData && "errors" in actionData && actionData.errors?.email && (
-                  <p className="text-sm text-destructive">{actionData.errors.email[0]}</p>
-                )}
-              </div>
+              <FormField
+                label="Email"
+                name="email"
+                type="email"
+                defaultValue={typedUser.email}
+                disabled={!canModify}
+                error={actionData && "errors" in actionData ? actionData.errors?.email : undefined}
+              />
 
-              <div className="space-y-2">
-                <Label htmlFor="role">Role</Label>
-                <Select
-                  name="role"
-                  defaultValue={typedUser.role}
-                  disabled={!canModify || isSelf}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="USER">User</SelectItem>
-                    <SelectItem value="ADMIN">Admin</SelectItem>
-                    {currentUser.role === "OWNER" && (
-                      <SelectItem value="OWNER">Owner</SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
+              <FormSelect
+                label="Role"
+                name="role"
+                defaultValue={typedUser.role}
+                disabled={!canModify || isSelf}
+                options={[
+                  { label: "User", value: "USER" },
+                  { label: "Admin", value: "ADMIN" },
+                  ...(currentUser.role === "OWNER" ? [{ label: "Owner", value: "OWNER" }] : []),
+                ]}
+              />
             </div>
 
             {typedUser.company && (
-              <div className="space-y-2">
-                <Label>Company</Label>
-                <Input value={typedUser.company.name} disabled />
-              </div>
+              <FormField
+                label="Company"
+                value={typedUser.company.name}
+                disabled
+              />
             )}
 
             {canModify && (
@@ -489,7 +515,9 @@ export default function UserDetailPage({
             <Package className="h-5 w-5" />
             Active Assignments ({activeAssignments.length})
           </CardTitle>
-          <CardDescription>Assets currently assigned to this user</CardDescription>
+          <CardDescription>
+            Assets currently assigned to this user
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {activeAssignments.length === 0 ? (
@@ -518,12 +546,13 @@ export default function UserDetailPage({
                         {assignment.asset.name}
                       </Link>
                     </TableCell>
-                    <TableCell>{assignment.asset.serialNumber || "-"}</TableCell>
                     <TableCell>
-                      {formatDate(assignment.assignedDate)}
+                      {assignment.asset.serialNumber || "-"}
                     </TableCell>
+                    <TableCell>{formatDate(assignment.assignedDate)}</TableCell>
                     <TableCell className="text-muted-foreground">
-                      {formatDuration(assignment.assignedDate, new Date())} (ongoing)
+                      {formatDuration(assignment.assignedDate, new Date())}{" "}
+                      (ongoing)
                     </TableCell>
                     <TableCell>{assignment.notes || "-"}</TableCell>
                   </TableRow>
@@ -559,13 +588,15 @@ export default function UserDetailPage({
               <TableBody>
                 {pastAssignments.map((assignment) => (
                   <TableRow key={assignment.id}>
-                    <TableCell className="font-medium">
-                      {assignment.asset.name}
-                    </TableCell>
-                    <TableCell>{assignment.asset.serialNumber || "-"}</TableCell>
+                    <Link to={`/dashboard/assets/${assignment.asset.id}`} className="hover:underline">
+                      <TableCell className="font-medium">
+                        {assignment.asset.name}
+                      </TableCell>
+                    </Link>
                     <TableCell>
-                      {formatDate(assignment.assignedDate)}
+                      {assignment.asset.serialNumber || "-"}
                     </TableCell>
+                    <TableCell>{formatDate(assignment.assignedDate)}</TableCell>
                     <TableCell>
                       {assignment.returnDate
                         ? formatDate(assignment.returnDate)
@@ -573,7 +604,10 @@ export default function UserDetailPage({
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {assignment.returnDate
-                        ? formatDuration(assignment.assignedDate, assignment.returnDate)
+                        ? formatDuration(
+                            assignment.assignedDate,
+                            assignment.returnDate,
+                          )
                         : "-"}
                     </TableCell>
                     <TableCell>{getStatusBadge(assignment.status)}</TableCell>

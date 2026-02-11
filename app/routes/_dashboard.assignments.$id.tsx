@@ -1,4 +1,4 @@
-import { redirect, data, Form, Link, useNavigation } from "react-router";
+import { redirect, Form, Link, useNavigation } from "react-router";
 import type { Route } from "./+types/_dashboard.assignments.$id";
 import { requireAuth } from "~/lib/session.server";
 import { getCompanyFilter } from "~/services/company.service.server";
@@ -9,18 +9,11 @@ import {
   transferAssignment,
   getActiveUsers,
 } from "~/services/assignment.service.server";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
-import { Label } from "~/components/ui/label";
-import { Textarea } from "~/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "~/components/ui/select";
+import { FormSelect } from "~/components/forms/form-select";
+import { FormTextarea } from "~/components/forms/form-textarea";
 import {
   Dialog,
   DialogContent,
@@ -43,6 +36,7 @@ import {
 } from "lucide-react";
 import type { AssignmentStatus } from "@prisma/client";
 import { useState } from "react";
+import type { AssignmentWithRelations } from "~/types";
 
 export function meta({ data }: Route.MetaArgs) {
   return [
@@ -64,6 +58,11 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     throw redirect("/dashboard/assignments");
   }
 
+  // Restrict access for USER role
+  if (user.role === "USER" && assignment.userId !== user.id) {
+    throw new Response("You do not have permission to view this assignment", { status: 403 });
+  }
+
   // Get users for transfer (admin/owner only)
   let transferUsers: Array<{
     id: string;
@@ -78,7 +77,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     transferUsers = transferUsers.filter((u) => u.id !== assignment.userId);
   }
 
-  return { user, assignment, transferUsers };
+  return { user, assignment: assignment as AssignmentWithRelations, transferUsers };
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
@@ -170,19 +169,20 @@ export default function AssignmentDetailPage({
   actionData,
 }: Route.ComponentProps) {
   const { user, assignment, transferUsers } = loaderData;
+  const typedAssignment = assignment as AssignmentWithRelations;
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
 
   const canReturn =
-    assignment.status === "ACTIVE" &&
+    typedAssignment.status === "ACTIVE" &&
     (user.role === "OWNER" ||
       user.role === "ADMIN" ||
-      assignment.userId === user.id);
+      typedAssignment.userId === user.id);
 
   const canTransfer =
-    assignment.status === "ACTIVE" &&
+    typedAssignment.status === "ACTIVE" &&
     (user.role === "OWNER" || user.role === "ADMIN");
 
   return (
@@ -218,15 +218,12 @@ export default function AssignmentDetailPage({
                 </DialogHeader>
                 <Form method="post" className="space-y-4">
                   <input type="hidden" name="intent" value="return" />
-                  <div className="space-y-2">
-                    <Label htmlFor="return-notes">Notes (Optional)</Label>
-                    <Textarea
-                      id="return-notes"
-                      name="notes"
-                      placeholder="Add any notes about the return..."
-                      rows={3}
-                    />
-                  </div>
+                  <FormTextarea
+                    label="Notes (Optional)"
+                    name="notes"
+                    placeholder="Add any notes about the return..."
+                    rows={3}
+                  />
                   <div className="flex justify-end gap-2">
                     <Button
                       type="button"
@@ -268,30 +265,22 @@ export default function AssignmentDetailPage({
                 </DialogHeader>
                 <Form method="post" className="space-y-4">
                   <input type="hidden" name="intent" value="transfer" />
-                  <div className="space-y-2">
-                    <Label htmlFor="newUserId">Transfer To *</Label>
-                    <Select name="newUserId" required>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a user" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {transferUsers.map((u) => (
-                          <SelectItem key={u.id} value={u.id}>
-                            {u.firstName} {u.lastName} ({u.email})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="transfer-notes">Notes (Optional)</Label>
-                    <Textarea
-                      id="transfer-notes"
-                      name="notes"
-                      placeholder="Add any notes about the transfer..."
-                      rows={3}
-                    />
-                  </div>
+                  <FormSelect
+                    label="Transfer To"
+                    name="newUserId"
+                    required
+                    placeholder="Select a user"
+                    options={transferUsers.map((u) => ({
+                      label: `${u.firstName} ${u.lastName} (${u.email})`,
+                      value: u.id,
+                    }))}
+                  />
+                  <FormTextarea
+                    label="Notes (Optional)"
+                    name="notes"
+                    placeholder="Add any notes about the transfer..."
+                    rows={3}
+                  />
                   <div className="flex justify-end gap-2">
                     <Button
                       type="button"
@@ -333,34 +322,34 @@ export default function AssignmentDetailPage({
           <CardContent className="space-y-4">
             <div className="flex justify-between items-center">
               <span className="text-muted-foreground">Status</span>
-              {getStatusBadge(assignment.status)}
+              {getStatusBadge(typedAssignment.status)}
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Assigned Date</span>
               <span className="font-medium">
-                {formatDate(assignment.assignedDate)}
+                {formatDate(typedAssignment.assignedDate)}
               </span>
             </div>
-            {assignment.dueDate && (
+            {typedAssignment.dueDate && (
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Due Date</span>
                 <span className="font-medium">
-                  {formatDate(assignment.dueDate)}
+                  {formatDate(typedAssignment.dueDate)}
                 </span>
               </div>
             )}
-            {assignment.returnDate && (
+            {typedAssignment.returnDate && (
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Return Date</span>
                 <span className="font-medium">
-                  {formatDate(assignment.returnDate)}
+                  {formatDate(typedAssignment.returnDate)}
                 </span>
               </div>
             )}
-            {assignment.notes && (
+            {typedAssignment.notes && (
               <div className="pt-4 border-t">
                 <span className="text-muted-foreground text-sm">Notes</span>
-                <p className="mt-1 whitespace-pre-wrap">{assignment.notes}</p>
+                <p className="mt-1 whitespace-pre-wrap">{typedAssignment.notes}</p>
               </div>
             )}
           </CardContent>
@@ -377,30 +366,30 @@ export default function AssignmentDetailPage({
           <CardContent className="space-y-4">
             <div>
               <span className="text-muted-foreground text-sm">Name</span>
-              <p className="font-medium text-lg">{assignment.asset.name}</p>
+              <p className="font-medium text-lg">{typedAssignment.asset.name}</p>
             </div>
-            {assignment.asset.serialNumber && (
+            {typedAssignment.asset.serialNumber && (
               <div>
                 <span className="text-muted-foreground text-sm">
                   Serial Number
                 </span>
-                <p className="font-medium">{assignment.asset.serialNumber}</p>
+                <p className="font-medium">{typedAssignment.asset.serialNumber}</p>
               </div>
             )}
-            {assignment.asset.category && (
+            {typedAssignment.asset.category && (
               <div>
                 <span className="text-muted-foreground text-sm">Category</span>
-                <p className="font-medium">{assignment.asset.category}</p>
+                <p className="font-medium">{typedAssignment.asset.category}</p>
               </div>
             )}
-            {assignment.asset.location && (
+            {typedAssignment.asset.location && (
               <div>
                 <span className="text-muted-foreground text-sm">Location</span>
-                <p className="font-medium">{assignment.asset.location}</p>
+                <p className="font-medium">{typedAssignment.asset.location}</p>
               </div>
             )}
             <div className="pt-4">
-              <Link to={`/dashboard/assets/${assignment.asset.id}`}>
+              <Link to={`/dashboard/assets/${typedAssignment.asset.id}`}>
                 <Button variant="outline" size="sm">
                   View Asset Details
                 </Button>
@@ -421,12 +410,12 @@ export default function AssignmentDetailPage({
             <div>
               <span className="text-muted-foreground text-sm">Name</span>
               <p className="font-medium text-lg">
-                {assignment.user.firstName} {assignment.user.lastName}
+                {typedAssignment.user.firstName} {typedAssignment.user.lastName}
               </p>
             </div>
             <div>
               <span className="text-muted-foreground text-sm">Email</span>
-              <p className="font-medium">{assignment.user.email}</p>
+              <p className="font-medium">{typedAssignment.user.email}</p>
             </div>
           </CardContent>
         </Card>
@@ -448,40 +437,40 @@ export default function AssignmentDetailPage({
                 <div>
                   <span className="text-sm font-medium">Assigned</span>
                   <p className="text-sm text-muted-foreground">
-                    {formatDate(assignment.assignedDate)}
+                    {formatDate(typedAssignment.assignedDate)}
                   </p>
                 </div>
               </div>
 
-              {assignment.dueDate && (
+              {typedAssignment.dueDate && (
                 <div className="relative">
                   <div className="absolute -left-4 w-3 h-3 rounded-full bg-yellow-500" />
                   <div>
                     <span className="text-sm font-medium">Due Date</span>
                     <p className="text-sm text-muted-foreground">
-                      {formatDate(assignment.dueDate)}
+                      {formatDate(typedAssignment.dueDate)}
                     </p>
                   </div>
                 </div>
               )}
 
-              {assignment.returnDate && (
+              {typedAssignment.returnDate && (
                 <div className="relative">
                   <div className="absolute -left-4 w-3 h-3 rounded-full bg-blue-500" />
                   <div>
                     <span className="text-sm font-medium">
-                      {assignment.status === "TRANSFERRED"
+                      {typedAssignment.status === "TRANSFERRED"
                         ? "Transferred"
                         : "Returned"}
                     </span>
                     <p className="text-sm text-muted-foreground">
-                      {formatDate(assignment.returnDate)}
+                      {formatDate(typedAssignment.returnDate)}
                     </p>
                   </div>
                 </div>
               )}
 
-              {assignment.status === "ACTIVE" && !assignment.returnDate && (
+              {typedAssignment.status === "ACTIVE" && !typedAssignment.returnDate && (
                 <div className="relative">
                   <div className="absolute -left-4 w-3 h-3 rounded-full border-2 border-muted-foreground bg-background" />
                   <div>
@@ -496,5 +485,6 @@ export default function AssignmentDetailPage({
         </Card>
       </div>
     </div>
+
   );
 }

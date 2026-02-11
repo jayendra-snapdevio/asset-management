@@ -46,56 +46,6 @@ export interface DashboardStats {
   recentAssignments: AssignmentWithRelations[];
 }
 
-// Pagination
-export interface PaginationParams {
-  page: number;
-  limit: number;
-}
-
-export interface PaginatedResult<T> {
-  data: T[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-}
-
-// Search/Filter params
-export interface AssetFilters {
-  search?: string;
-  status?: AssetStatus;
-  category?: string;
-  companyId?: string;
-}
-
-export interface UserFilters {
-  search?: string;
-  role?: Role;
-  companyId?: string;
-  isActive?: boolean;
-}
-
-// Form action results
-export interface ActionResult<T = unknown> {
-  success: boolean;
-  message?: string;
-  errors?: Record<string, string[]>;
-  data?: T;
-}
-
-// Auth types
-export interface LoginCredentials {
-  email: string;
-  password: string;
-}
-
-export interface RegisterData extends LoginCredentials {
-  firstName: string;
-  lastName: string;
-}
-
-// Select options
-export interface SelectOption {
-  value: string;
-  label: string;
-}
+// Route-specific types
+export * from "./routes";
+export type { AssetDetail } from "./routes/asset";

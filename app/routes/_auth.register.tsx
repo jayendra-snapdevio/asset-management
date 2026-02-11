@@ -5,9 +5,16 @@ import { createSession, getCurrentUser } from "~/lib/session.server";
 import { prisma } from "~/lib/db.server";
 import { registerSchema } from "~/validators/auth.validator";
 import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
-import { Label } from "~/components/ui/label";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "~/components/ui/card";
+import { FormField } from "~/components/forms/form-field";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
+import { PasswordToggleField } from "~/components/forms/password-input";
 
 export function meta() {
   return [
@@ -20,7 +27,9 @@ export async function loader({ request }: Route.LoaderArgs) {
   // Redirect if already logged in
   const user = await getCurrentUser(request);
   if (user) {
-    return redirect(user.role === "USER" ? "/dashboard/my-assets" : "/dashboard");
+    return redirect(
+      user.role === "USER" ? "/dashboard/my-assets" : "/dashboard",
+    );
   }
   return null;
 }
@@ -39,7 +48,7 @@ export async function action({ request }: Route.ActionArgs) {
   if (!result.success) {
     return data<ActionResponse>(
       { errors: result.error.flatten().fieldErrors, values: rawData },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -49,8 +58,11 @@ export async function action({ request }: Route.ActionArgs) {
   const existingUser = await prisma.user.findUnique({ where: { email } });
   if (existingUser) {
     return data<ActionResponse>(
-      { errors: { email: ["This email is already registered"] }, values: rawData },
-      { status: 400 }
+      {
+        errors: { email: ["This email is already registered"] },
+        values: rawData,
+      },
+      { status: 400 },
     );
   }
 
@@ -90,88 +102,52 @@ export default function RegisterPage({ actionData }: Route.ComponentProps) {
       <Form method="post">
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="firstName">First name</Label>
-              <Input
-                id="firstName"
-                name="firstName"
-                placeholder="John"
-                defaultValue={values?.firstName}
-                required
-                autoComplete="given-name"
-              />
-              {errors?.firstName && (
-                <p className="text-sm text-red-500">{errors.firstName[0]}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="lastName">Last name</Label>
-              <Input
-                id="lastName"
-                name="lastName"
-                placeholder="Doe"
-                defaultValue={values?.lastName}
-                required
-                autoComplete="family-name"
-              />
-              {errors?.lastName && (
-                <p className="text-sm text-red-500">{errors.lastName[0]}</p>
-              )}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              name="email"
-              type="email"
-              placeholder="you@example.com"
-              defaultValue={values?.email}
+            <FormField
+              label="First name"
+              name="firstName"
+              placeholder="John"
+              defaultValue={values?.firstName}
               required
-              autoComplete="email"
+              autoComplete="given-name"
+              error={errors?.firstName}
             />
-            {errors?.email && (
-              <p className="text-sm text-red-500">{errors.email[0]}</p>
-            )}
+
+            <FormField
+              label="Last name"
+              name="lastName"
+              placeholder="Doe"
+              defaultValue={values?.lastName}
+              required
+              autoComplete="family-name"
+              error={errors?.lastName}
+            />
           </div>
 
+          <FormField
+            label="Email"
+            name="email"
+            type="email"
+            placeholder="you@example.com"
+            defaultValue={values?.email}
+            required
+            autoComplete="email"
+            error={errors?.email}
+          />
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
+            <PasswordToggleField
               name="password"
-              type="password"
-              placeholder="••••••••"
-              required
-              autoComplete="new-password"
+              label="Password"
+              errors={errors?.password}
             />
-            {errors?.password && (
-              <p className="text-sm text-red-500">{errors.password[0]}</p>
-            )}
-            <p className="text-xs text-muted-foreground">
-              At least 8 characters with uppercase, lowercase, and number
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="confirmPassword">Confirm password</Label>
-            <Input
-              id="confirmPassword"
+            <PasswordToggleField
               name="confirmPassword"
-              type="password"
-              placeholder="••••••••"
-              required
-              autoComplete="new-password"
+              label="Confirm password"
+              errors={errors?.confirmPassword}
             />
-            {errors?.confirmPassword && (
-              <p className="text-sm text-red-500">{errors.confirmPassword[0]}</p>
-            )}
           </div>
         </CardContent>
 
-        <CardFooter className="flex flex-col space-y-4">
+        <CardFooter className="flex flex-col space-y-4 pt-4 ">
           <Button type="submit" className="w-full" disabled={isSubmitting}>
             {isSubmitting ? "Creating account..." : "Create account"}
           </Button>

@@ -1,17 +1,29 @@
 import { useState } from "react";
-import { data, redirect, Form, useSearchParams, Link, useNavigation } from "react-router";
+import {
+  data,
+  redirect,
+  Form,
+  useSearchParams,
+  Link,
+  useNavigation,
+} from "react-router";
 import type { Route } from "./+types/_dashboard.users";
 import { requireRole } from "~/lib/session.server";
 import { handleError, errorResponse } from "~/lib/errors.server";
-import { getUsers, createUser } from "~/services/user.service.server";
+import { getUsers, createUser, deleteUser } from "~/services/user.service.server";
 import { getCompaniesByOwner } from "~/services/company.service.server";
 import { createUserSchema } from "~/validators/user.validator";
 import { prisma } from "~/lib/db.server";
 import type { Role } from "@prisma/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
-import { Label } from "~/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -37,33 +49,25 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { Badge } from "~/components/ui/badge";
+import { FormField } from "~/components/forms/form-field";
+import { FormSelect } from "~/components/forms/form-select";
+import { Pagination } from "~/components/shared/Pagination";
 import {
   Users,
   Plus,
   Search,
   Eye,
-  ChevronLeft,
-  ChevronRight,
   Shield,
   User,
   Crown,
   Package,
   CheckCircle,
   XCircle,
+  Edit2,
+  Trash2,
 } from "lucide-react";
-
-type UserListItem = {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  role: string;
-  isActive: boolean;
-  createdAt: Date;
-  companyId: string | null;
-  company: { id: string; name: string } | null;
-  _count: { assignments: number };
-};
+import { PasswordToggleField } from "~/components/forms/password-input";
+import type { UserListItem } from "~/types";
 
 export function meta() {
   return [{ title: "Users - Asset Management" }];
@@ -77,7 +81,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   const search = url.searchParams.get("search") || "";
   const roleFilter = url.searchParams.get("role") as Role | undefined;
   const isActiveFilter = url.searchParams.get("isActive");
-  const limit = 10;
+  const limit = parseInt(url.searchParams.get("limit") || "10");
 
   const { users, pagination } = await getUsers(user, {
     page,
@@ -90,7 +94,11 @@ export async function loader({ request }: Route.LoaderArgs) {
   // For OWNER, get all their companies so they can assign users to them
   let companies: { id: string; name: string }[] = [];
   if (user.role === "OWNER") {
-    const result = await getCompaniesByOwner(user.id, { page: 1, limit: 100, search: "" });
+    const result = await getCompaniesByOwner(user.id, {
+      page: 1,
+      limit: 100,
+      search: "",
+    });
     companies = result.companies.map((c) => ({ id: c.id, name: c.name }));
   } else if (user.companyId) {
     // For ADMIN, just get their company
@@ -103,28 +111,64 @@ export async function loader({ request }: Route.LoaderArgs) {
     }
   }
 
-  return { currentUser: user, users, pagination, search, roleFilter, isActiveFilter, companies };
+  return {
+    currentUser: user,
+    users,
+    pagination,
+    search,
+    roleFilter,
+    isActiveFilter,
+    companies,
+  };
 }
 
 export async function action({ request }: Route.ActionArgs) {
   const user = await requireRole(request, ["OWNER", "ADMIN"]);
   const formData = await request.formData();
+  const intent = formData.get("intent");
   const rawData = Object.fromEntries(formData);
+
+  if (intent === "delete") {
+    const userId = formData.get("userId") as string;
+    if (!userId) {
+      return data({ error: "User ID is required", success: false }, { status: 400 });
+    }
+    try {
+      const result = await deleteUser(userId, user);
+      if (result.error) {
+        return errorResponse(result.error);
+      }
+      return data({ success: true, message: "User deleted successfully" });
+    } catch (error) {
+      return handleError(error);
+    }
+  }
 
   const result = createUserSchema.safeParse(rawData);
   if (!result.success) {
-    return data({ errors: result.error.flatten().fieldErrors, error: undefined, success: false }, { status: 400 });
+    return data(
+      {
+        errors: result.error.flatten().fieldErrors,
+        error: undefined,
+        success: false,
+      },
+      { status: 400 },
+    );
   }
 
   // Get companyId from form (for OWNER) or from user (for ADMIN)
   let companyId = user.companyId;
-  
+
   if (user.role === "OWNER") {
     const selectedCompanyId = formData.get("companyId") as string;
     if (!selectedCompanyId) {
       return data(
-        { error: "Please select a company for this user", errors: undefined, success: false },
-        { status: 400 }
+        {
+          error: "Please select a company for this user",
+          errors: undefined,
+          success: false,
+        },
+        { status: 400 },
       );
     }
     // Verify the owner actually owns this company
@@ -133,8 +177,12 @@ export async function action({ request }: Route.ActionArgs) {
     });
     if (!company) {
       return data(
-        { error: "You don't have permission to add users to this company", errors: undefined, success: false },
-        { status: 403 }
+        {
+          error: "You don't have permission to add users to this company",
+          errors: undefined,
+          success: false,
+        },
+        { status: 403 },
       );
     }
     companyId = selectedCompanyId;
@@ -142,8 +190,12 @@ export async function action({ request }: Route.ActionArgs) {
 
   if (!companyId) {
     return data(
-      { error: "You must be associated with a company to create users", errors: undefined, success: false },
-      { status: 400 }
+      {
+        error: "You must be associated with a company to create users",
+        errors: undefined,
+        success: false,
+      },
+      { status: 400 },
     );
   }
 
@@ -156,7 +208,7 @@ export async function action({ request }: Route.ActionArgs) {
         lastName: result.data.lastName,
         role: result.data.role,
       },
-      { ...user, companyId } // Pass the selected companyId
+      { ...user, companyId }, // Pass the selected companyId
     );
 
     if (createResult.error) {
@@ -169,12 +221,23 @@ export async function action({ request }: Route.ActionArgs) {
   }
 }
 
-export default function UsersPage({ loaderData, actionData }: Route.ComponentProps) {
-  const { currentUser, users, pagination, search, roleFilter, isActiveFilter, companies } = loaderData;
+export default function UsersPage({
+  loaderData,
+  actionData,
+}: Route.ComponentProps) {
+  const {
+    currentUser,
+    users,
+    pagination,
+    search,
+    roleFilter,
+    isActiveFilter,
+    companies,
+  } = loaderData;
   const [searchParams, setSearchParams] = useSearchParams();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<string>(
-    companies.length === 1 ? companies[0].id : ""
+    companies.length === 1 ? companies[0].id : "",
   );
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
@@ -246,7 +309,10 @@ export default function UsersPage({ loaderData, actionData }: Route.ComponentPro
 
   const getStatusBadge = (isActive: boolean) => {
     return isActive ? (
-      <Badge variant="outline" className="gap-1 text-green-600 border-green-600">
+      <Badge
+        variant="outline"
+        className="gap-1 text-green-600 border-green-600"
+      >
         <CheckCircle className="h-3 w-3" />
         Active
       </Badge>
@@ -277,7 +343,7 @@ export default function UsersPage({ loaderData, actionData }: Route.ComponentPro
             </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-[500px]">
-            <Form method="post" onSubmit={() => setIsDialogOpen(false)}>
+            <Form method="post" onSubmit={() => setIsDialogOpen(true)}>
               <DialogHeader>
                 <DialogTitle>Create New User</DialogTitle>
                 <DialogDescription>
@@ -286,89 +352,75 @@ export default function UsersPage({ loaderData, actionData }: Route.ComponentPro
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="firstName">First Name *</Label>
-                    <Input id="firstName" name="firstName" required />
-                    {actionData && "errors" in actionData && actionData.errors?.firstName && (
-                      <p className="text-sm text-destructive">{actionData.errors.firstName[0]}</p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="lastName">Last Name *</Label>
-                    <Input id="lastName" name="lastName" required />
-                    {actionData && "errors" in actionData && actionData.errors?.lastName && (
-                      <p className="text-sm text-destructive">{actionData.errors.lastName[0]}</p>
-                    )}
-                  </div>
+                  <FormField
+                    label="First Name"
+                    name="firstName"
+                    required
+                    error={actionData && "errors" in actionData ? actionData.errors?.firstName : undefined}
+                  />
+                  <FormField
+                    label="Last Name"
+                    name="lastName"
+                    required
+                    error={actionData && "errors" in actionData ? actionData.errors?.lastName : undefined}
+                  />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email *</Label>
-                  <Input id="email" name="email" type="email" required />
-                  {actionData && "errors" in actionData && actionData.errors?.email && (
-                    <p className="text-sm text-destructive">{actionData.errors.email[0]}</p>
-                  )}
-                  {actionData && "error" in actionData && actionData.error && (
-                    <p className="text-sm text-destructive">{actionData.error}</p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password *</Label>
-                  <Input id="password" name="password" type="password" required />
-                  {actionData && "errors" in actionData && actionData.errors?.password && (
-                    <p className="text-sm text-destructive">{actionData.errors.password[0]}</p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="role">Role</Label>
-                  <Select name="role" defaultValue="USER">
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="USER">User</SelectItem>
-                      <SelectItem value="ADMIN">Admin</SelectItem>
-                      {currentUser.role === "OWNER" && (
-                        <SelectItem value="OWNER">Owner</SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
+
+                <FormField
+                  label="Email"
+                  name="email"
+                  type="email"
+                  required
+                  error={(actionData && "errors" in actionData ? actionData.errors?.email : undefined) || (actionData && "error" in actionData ? actionData.error : undefined)}
+                />
+
+                <PasswordToggleField
+                  name="password"
+                  label="Password"
+                  errors={actionData && "errors" in actionData ? actionData.errors?.password : undefined}
+                />
+
+                <FormSelect
+                  label="Role"
+                  name="role"
+                  defaultValue="USER"
+                  options={[
+                    { label: "User", value: "USER" },
+                    { label: "Admin", value: "ADMIN" },
+                    ...(currentUser.role === "OWNER" ? [{ label: "Owner", value: "OWNER" }] : []),
+                  ]}
+                />
 
                 {/* Company Selector (for OWNER with multiple companies) */}
                 {currentUser.role === "OWNER" && companies.length > 1 && (
-                  <div className="space-y-2">
-                    <Label htmlFor="companyId">Company *</Label>
-                    <Select
-                      value={selectedCompany}
-                      onValueChange={setSelectedCompany}
-                      name="companyId"
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a company" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {companies.map((company) => (
-                          <SelectItem key={company.id} value={company.id}>
-                            {company.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <input type="hidden" name="companyId" value={selectedCompany} />
-                  </div>
-                )}
-                {/* Hidden companyId for OWNER with single company */}
-                {currentUser.role === "OWNER" && companies.length === 1 && (
-                  <input type="hidden" name="companyId" value={companies[0].id} />
+                  <FormSelect
+                    label="Company"
+                    name="companyId"
+                    value={selectedCompany}
+                    onValueChange={setSelectedCompany}
+                    required
+                    options={companies.map((company) => ({
+                      label: company.name,
+                      value: company.id,
+                    }))}
+                  />
                 )}
 
                 {/* Hidden companyId for single company */}
                 {(currentUser.role !== "OWNER" || companies.length === 1) && (
-                  <input type="hidden" name="companyId" value={companies[0]?.id || ""} />
+                  <input
+                    type="hidden"
+                    name="companyId"
+                    value={companies[0]?.id || ""}
+                  />
                 )}
               </div>
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsDialogOpen(false)}
+                >
                   Cancel
                 </Button>
                 <Button type="submit" disabled={isSubmitting}>
@@ -384,7 +436,10 @@ export default function UsersPage({ loaderData, actionData }: Route.ComponentPro
       <Card>
         <CardContent className="pt-1">
           <div className="flex flex-wrap gap-4">
-            <form onSubmit={handleSearch} className="flex gap-2 flex-1 min-w-[200px]">
+            <form
+              onSubmit={handleSearch}
+              className="flex gap-2 flex-1 min-w-[200px]"
+            >
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -403,7 +458,7 @@ export default function UsersPage({ loaderData, actionData }: Route.ComponentPro
               onValueChange={(value) => handleFilterChange("role", value)}
             >
               <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Role" />
+                <SelectValue placeholder="Role"  />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Roles</SelectItem>
@@ -459,7 +514,8 @@ export default function UsersPage({ loaderData, actionData }: Route.ComponentPro
           <CardHeader>
             <CardTitle>User List</CardTitle>
             <CardDescription>
-              {pagination.total} {pagination.total === 1 ? "user" : "users"} total
+              {pagination.total} {pagination.total === 1 ? "user" : "users"}{" "}
+              total
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -471,14 +527,16 @@ export default function UsersPage({ loaderData, actionData }: Route.ComponentPro
                   <TableHead>Role</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-center">Active Assets</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {typedUsers.map((user) => (
                   <TableRow key={user.id}>
                     <TableCell className="font-medium">
-                      {user.firstName} {user.lastName}
+                      <Link className="hover:underline" to={`/dashboard/users/${user.id}`}>
+                        {user.firstName} {user.lastName}
+                      </Link>
                     </TableCell>
                     <TableCell>{user.email}</TableCell>
                     <TableCell>{getRoleBadge(user.role)}</TableCell>
@@ -490,48 +548,63 @@ export default function UsersPage({ loaderData, actionData }: Route.ComponentPro
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button asChild variant="ghost" size="sm">
-                        <Link to={`/dashboard/users/${user.id}`}>
-                          <Eye className="h-4 w-4 mr-1" />
-                          View
-                        </Link>
-                      </Button>
+                      <div className="flex justify-start gap-1">
+                        <Button asChild variant="ghost" size="icon" className="h-8 w-8" title="View details">
+                          <Link to={`/dashboard/users/${user.id}`}>
+                            <Eye className="h-3 w-3" />
+                          </Link>
+                        </Button>
+                        <Button asChild variant="ghost" size="icon" className="h-8 w-8" title="Edit user">
+                          <Link to={`/dashboard/users/${user.id}`}>
+                            <Edit2 className="h-3 w-3" />
+                          </Link>
+                        </Button>
+                        
+                        {currentUser.id !== user.id && (
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" title="Delete user">
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                              <DialogHeader>
+                                <DialogTitle>Delete User</DialogTitle>
+                                <DialogDescription>
+                                  Are you sure you want to delete {user.firstName} {user.lastName}? This action cannot be undone.
+                                </DialogDescription>
+                              </DialogHeader>
+                              <DialogFooter className="mt-4">
+                                <Form method="post">
+                                  <input type="hidden" name="intent" value="delete" />
+                                  <input type="hidden" name="userId" value={user.id} />
+                                  <div className="flex gap-2 justify-end">
+                                    <DialogTrigger asChild>
+                                      <Button type="button" variant="outline">Cancel</Button>
+                                    </DialogTrigger>
+                                    <Button type="submit" variant="destructive" disabled={isSubmitting}>
+                                      {isSubmitting ? "Deleting..." : "Delete User"}
+                                    </Button>
+                                  </div>
+                                </Form>
+                              </DialogFooter>
+                            </DialogContent>
+                          </Dialog>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
 
-            {/* Pagination */}
-            {pagination.totalPages > 1 && (
-              <div className="flex items-center justify-between mt-4 pt-4 border-t">
-                <p className="text-sm text-muted-foreground">
-                  Showing {(pagination.page - 1) * pagination.limit + 1} to{" "}
-                  {Math.min(pagination.page * pagination.limit, pagination.total)} of{" "}
-                  {pagination.total} results
-                </p>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => goToPage(pagination.page - 1)}
-                    disabled={pagination.page === 1}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                    Previous
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => goToPage(pagination.page + 1)}
-                    disabled={pagination.page === pagination.totalPages}
-                  >
-                    Next
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            )}
+            <Pagination
+              pagination={pagination}
+              onPageChange={goToPage}
+              onLimitChange={(value) => handleFilterChange("limit", value)}
+              itemName="results"
+              className="mt-4"
+            />
           </CardContent>
         </Card>
       )}

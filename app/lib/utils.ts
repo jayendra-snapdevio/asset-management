@@ -16,14 +16,18 @@ export function formatDuration(start: Date | string, end: Date | string): string
   const diffMinutes = Math.floor(diffMs / (1000 * 60));
   const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  const diffMonths = Math.floor(diffDays / 30);
-  const diffYears = Math.floor(diffDays / 365);
+  
+  // Calculate months and years using date arithmetic for accuracy
+  const yearsDiff = endDate.getFullYear() - startDate.getFullYear();
+  const monthsDiff = endDate.getMonth() - startDate.getMonth();
+  const totalMonths = yearsDiff * 12 + monthsDiff;
+  const diffYears = Math.floor(totalMonths / 12);
 
   if (diffYears > 0) {
     return diffYears === 1 ? "1 year" : `${diffYears} years`;
   }
-  if (diffMonths > 0) {
-    return diffMonths === 1 ? "1 month" : `${diffMonths} months`;
+  if (totalMonths > 0) {
+    return totalMonths === 1 ? "1 month" : `${totalMonths} months`;
   }
   if (diffDays > 0) {
     return diffDays === 1 ? "1 day" : `${diffDays} days`;

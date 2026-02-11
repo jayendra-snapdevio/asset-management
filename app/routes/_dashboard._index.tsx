@@ -130,16 +130,16 @@ export default function DashboardIndex({ loaderData }: Route.ComponentProps) {
         {/* User Stats */}
         <div className="grid gap-4 md:grid-cols-3">
           <StatCard
-            title="Current Assets"
-            value={stats.currentAssets}
-            icon="Package"
-            description="Currently assigned to you"
-          />
-          <StatCard
             title="Total Assigned"
             value={stats.totalAssigned}
             icon="UserCheck"
             description="All time"
+          />
+          <StatCard
+            title="Current Assets"
+            value={stats.currentAssets}
+            icon="Package"
+            description="Currently assigned to you"
           />
           <StatCard
             title="Returned"
@@ -177,7 +177,9 @@ export default function DashboardIndex({ loaderData }: Route.ComponentProps) {
                   {myAssets.map((assignment) => (
                     <TableRow key={assignment.id}>
                       <TableCell className="font-medium">
-                        {assignment.asset.name}
+                        <Link className="hover:underline" to={`/dashboard/assets/${assignment.asset.id}`}>
+                          {assignment.asset.name}
+                        </Link>
                       </TableCell>
                       <TableCell>
                         {assignment.asset.serialNumber || "-"}
@@ -215,7 +217,9 @@ export default function DashboardIndex({ loaderData }: Route.ComponentProps) {
                   {history.map((item) => (
                     <TableRow key={item.id}>
                       <TableCell className="font-medium">
-                        {item.asset.name}
+                        <Link className="hover:underline" to={`/dashboard/assets/${item.asset.id}`}>
+                          {item.asset.name}
+                        </Link>
                       </TableCell>
                       <TableCell>
                         {formatDate(item.assignedDate)}
@@ -308,24 +312,28 @@ export default function DashboardIndex({ loaderData }: Route.ComponentProps) {
           value={stats.totalAssets}
           icon="Package"
           description="All assets in system"
+          path="/dashboard/assets"
         />
         <StatCard
           title="Assigned"
           value={stats.assignedAssets}
           icon="UserCheck"
           description="Currently assigned"
+          path="/dashboard/assets?status=ASSIGNED&page=1"
         />
         <StatCard
           title="Available"
           value={stats.availableAssets}
           icon="CheckCircle"
           description="Ready to assign"
+          path="/dashboard/assets?status=AVAILABLE&page=1"
         />
         <StatCard
           title="Maintenance"
           value={stats.underMaintenance}
           icon="Wrench"
           description="Under maintenance"
+          path="/dashboard/assets?status=UNDER_MAINTENANCE&page=1"
         />
       </div>
 

@@ -9,20 +9,13 @@ import { updateAssetSchema } from "~/validators/asset.validator";
 import { prisma } from "~/lib/db.server";
 import { unlink } from "fs/promises";
 import { join } from "path";
-import type { AssetStatus, AssignmentStatus } from "@prisma/client";
+import type { AssetStatus, AssignmentStatus, OwnershipType } from "@prisma/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
-import { Label } from "~/components/ui/label";
-import { Textarea } from "~/components/ui/textarea";
 import { Badge } from "~/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "~/components/ui/select";
+import { FormField } from "~/components/forms/form-field";
+import { FormTextarea } from "~/components/forms/form-textarea";
+import { FormSelect } from "~/components/forms/form-select";
 import {
   Dialog,
   DialogContent,
@@ -54,41 +47,13 @@ import {
   History,
   Package,
 } from "lucide-react";
-import { ASSET_STATUS_LABELS, ASSET_STATUS_COLORS, ASSET_CATEGORIES, ASSIGNMENT_STATUS_LABELS, ASSIGNMENT_STATUS_COLORS } from "~/constants";
+import { ASSET_STATUS_LABELS, ASSET_STATUS_COLORS, ASSET_CATEGORIES, ASSIGNMENT_STATUS_LABELS, ASSIGNMENT_STATUS_COLORS, OWNERSHIP_TYPE_LABELS, OWNERSHIP_TYPE_OPTIONS } from "~/constants";
+import { getUsers } from "~/services/user.service.server";
 import { format } from "date-fns";
 import { ImageUpload } from "~/components/assets/ImageUpload";
 import { formatDuration } from "~/lib/utils";
-
-type AssetWithRelations = {
-  id: string;
-  name: string;
-  description: string | null;
-  serialNumber: string | null;
-  model: string | null;
-  manufacturer: string | null;
-  category: string | null;
-  status: AssetStatus;
-  purchaseDate: Date | null;
-  purchasePrice: number | null;
-  currentValue: number | null;
-  location: string | null;
-  tags: string[];
-  qrCode: string | null;
-  imageUrl: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-  createdBy: { id: string; firstName: string; lastName: string; email: string } | null;
-  company: { id: string; name: string } | null;
-  assignments: {
-    id: string;
-    status: AssignmentStatus;
-    assignedDate: Date;
-    returnDate: Date | null;
-    dueDate: Date | null;
-    notes: string | null;
-    user: { id: string; firstName: string; lastName: string; email: string };
-  }[];
-};
+import { SuccessMessage } from "~/components/ui/success-message";
+import type { AssetDetail } from "~/types";
 
 export function meta({ data }: Route.MetaArgs) {
   const assetName = data?.asset?.name || "Asset";
@@ -99,13 +64,20 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const user = await requireAuth(request);
   const companyFilter = await getCompanyFilter(user);
 
-  const asset = await getAssetById(params.id!, companyFilter);
+  const asset = await getAssetById(
+    params.id!,
+    companyFilter,
+    user.role === "USER" ? user.id : undefined
+  );
 
   if (!asset) {
     throw redirect("/dashboard/assets");
   }
 
-  return { user, asset };
+  const { users } = await getUsers(user, { page: 1, limit: 1000 });
+  const userOptions = users.map(u => ({ label: `${u.firstName} ${u.lastName} (${u.email})`, value: u.id }));
+
+  return { user, asset, userOptions };
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
@@ -142,6 +114,9 @@ export async function action({ request, params }: Route.ActionArgs) {
           status: result.data.status,
           category: result.data.category,
           tags: result.data.tags,
+          ownershipType: result.data.ownershipType,
+          ownerId: result.data.ownerId,
+          otherOwnership: result.data.otherOwnership,
         },
         companyFilter
       );
@@ -218,17 +193,18 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 export default function AssetDetailPage({ loaderData, actionData }: Route.ComponentProps) {
-  const { user, asset } = loaderData;
-  const typedAsset = asset as AssetWithRelations;
+  const { user, asset, userOptions } = loaderData;
+  const typedAsset = asset as unknown as AssetDetail;
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
   const [isEditing, setIsEditing] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [category, setCategory] = useState(typedAsset.category || "");
   const [status, setStatus] = useState(typedAsset.status);
+  const [ownershipType, setOwnershipType] = useState(typedAsset.ownershipType);
 
   const canEdit = user.role === "OWNER" || user.role === "ADMIN";
-  const activeAssignment = typedAsset.assignments.find((a) => a.status === "ACTIVE");
+  const activeAssignment = typedAsset.assignments.find((a) => a.status === ("ACTIVE" as AssignmentStatus));
 
   const getStatusBadge = (assetStatus: AssetStatus) => {
     return (
@@ -259,11 +235,19 @@ export default function AssetDetailPage({ loaderData, actionData }: Route.Compon
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link to="/dashboard/assets">
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
+          {user.role === "OWNER" || user.role === "ADMIN" ? (
+            <Link to="/dashboard/assets">
+              <Button variant="ghost" size="icon">
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </Link>
+          ) : (
+            <Link to="/dashboard/my-assets">
+              <Button variant="ghost" size="icon">
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            </Link>
+          )}
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold">{typedAsset.name}</h1>
@@ -352,9 +336,7 @@ export default function AssetDetailPage({ loaderData, actionData }: Route.Compon
         </div>
       )}
       {actionData && "success" in actionData && actionData.success && (
-        <div className="p-3 bg-green-100 text-green-800 rounded-md text-sm">
-          Asset updated successfully!
-        </div>
+        <SuccessMessage message="Asset updated successfully!" />
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -372,154 +354,142 @@ export default function AssetDetailPage({ loaderData, actionData }: Route.Compon
                 <Form method="post" className="space-y-4">
                   <input type="hidden" name="intent" value="update" />
 
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Asset Name *</Label>
-                    <Input
-                      id="name"
-                      name="name"
-                      defaultValue={typedAsset.name}
+                  <FormField
+                    label="Asset Name"
+                    name="name"
+                    defaultValue={typedAsset.name}
+                    required
+                    error={actionData && "errors" in actionData ? actionData.errors?.name : undefined}
+                  />
+
+                  <FormTextarea
+                    label="Description"
+                    name="description"
+                    defaultValue={typedAsset.description || ""}
+                    rows={3}
+                  />
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      label="Serial Number"
+                      name="serialNumber"
+                      defaultValue={typedAsset.serialNumber || ""}
+                    />
+
+                    <FormSelect
+                      label="Category"
+                      name="category"
+                      value={category}
+                      onValueChange={setCategory}
+                      placeholder="Select category"
+                      options={ASSET_CATEGORIES}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      label="Model"
+                      name="model"
+                      defaultValue={typedAsset.model || ""}
+                    />
+
+                    <FormField
+                      label="Manufacturer"
+                      name="manufacturer"
+                      defaultValue={typedAsset.manufacturer || ""}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormSelect
+                      label="Status"
+                      name="status"
+                      value={status}
+                      onValueChange={(v) => setStatus(v as AssetStatus)}
+                      options={[
+                        { label: "Available", value: "AVAILABLE" },
+                        { label: "Assigned", value: "ASSIGNED", disabled: !activeAssignment },
+                        { label: "Under Maintenance", value: "UNDER_MAINTENANCE" },
+                        { label: "Retired", value: "RETIRED" },
+                      ]}
+                    />
+
+                    <FormSelect
+                      label="Ownership Type"
+                      name="ownershipType"
+                      value={ownershipType}
+                      onValueChange={(v) => setOwnershipType(v as OwnershipType)}
+                      options={OWNERSHIP_TYPE_OPTIONS}
+                    />
+                  </div>
+
+                  {ownershipType === "PRIVATE" && (
+                    <FormSelect
+                      label="Select Owner (User)"
+                      name="ownerId"
+                      defaultValue={typedAsset.ownerId || ""}
+                      placeholder="Select user"
                       required
+                      options={userOptions}
+                      error={actionData && "errors" in actionData ? actionData.errors?.ownerId : undefined}
                     />
-                    {actionData && "errors" in actionData && actionData.errors?.name && (
-                      <p className="text-sm text-destructive">{actionData.errors.name[0]}</p>
-                    )}
-                  </div>
+                  )}
 
-                  <div className="space-y-2">
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea
-                      id="description"
-                      name="description"
-                      defaultValue={typedAsset.description || ""}
-                      rows={3}
+                  {ownershipType === "OTHER" && (
+                    <FormField
+                      label="Ownership Details"
+                      name="otherOwnership"
+                      defaultValue={typedAsset.otherOwnership || ""}
+                      placeholder="e.g., Leased from Company X"
+                      required
+                      error={actionData && "errors" in actionData ? actionData.errors?.otherOwnership : undefined}
                     />
-                  </div>
+                  )}
 
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="serialNumber">Serial Number</Label>
-                      <Input
-                        id="serialNumber"
-                        name="serialNumber"
-                        defaultValue={typedAsset.serialNumber || ""}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="category">Category</Label>
-                      <Select value={category} onValueChange={setCategory}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select category" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {ASSET_CATEGORIES.map((cat) => (
-                            <SelectItem key={cat.value} value={cat.value}>
-                              {cat.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <input type="hidden" name="category" value={category} />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="model">Model</Label>
-                      <Input
-                        id="model"
-                        name="model"
-                        defaultValue={typedAsset.model || ""}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="manufacturer">Manufacturer</Label>
-                      <Input
-                        id="manufacturer"
-                        name="manufacturer"
-                        defaultValue={typedAsset.manufacturer || ""}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="status">Status</Label>
-                      <Select value={status} onValueChange={(v) => setStatus(v as AssetStatus)}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="AVAILABLE">Available</SelectItem>
-                          <SelectItem value="ASSIGNED" disabled={!activeAssignment}>
-                            Assigned
-                          </SelectItem>
-                          <SelectItem value="UNDER_MAINTENANCE">Under Maintenance</SelectItem>
-                          <SelectItem value="RETIRED">Retired</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <input type="hidden" name="status" value={status} />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="location">Location</Label>
-                      <Input
-                        id="location"
-                        name="location"
-                        defaultValue={typedAsset.location || ""}
-                      />
-                    </div>
+                    <FormField
+                      label="Location"
+                      name="location"
+                      defaultValue={typedAsset.location || ""}
+                    />
                   </div>
 
                   <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="purchaseDate">Purchase Date</Label>
-                      <Input
-                        id="purchaseDate"
-                        name="purchaseDate"
-                        type="date"
-                        defaultValue={
-                          typedAsset.purchaseDate
-                            ? format(new Date(typedAsset.purchaseDate), "yyyy-MM-dd")
-                            : ""
-                        }
-                      />
-                    </div>
+                    <FormField
+                      label="Purchase Date"
+                      name="purchaseDate"
+                      type="date"
+                      defaultValue={
+                        typedAsset.purchaseDate
+                          ? format(new Date(typedAsset.purchaseDate), "yyyy-MM-dd")
+                          : ""
+                      }
+                    />
 
-                    <div className="space-y-2">
-                      <Label htmlFor="purchasePrice">Purchase Price ($)</Label>
-                      <Input
-                        id="purchasePrice"
-                        name="purchasePrice"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        defaultValue={typedAsset.purchasePrice || ""}
-                      />
-                    </div>
+                    <FormField
+                      label="Purchase Price"
+                      name="purchasePrice"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      defaultValue={typedAsset.purchasePrice || ""}
+                    />
 
-                    <div className="space-y-2">
-                      <Label htmlFor="currentValue">Current Value ($)</Label>
-                      <Input
-                        id="currentValue"
-                        name="currentValue"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        defaultValue={typedAsset.currentValue || ""}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="tags">Tags (comma-separated)</Label>
-                    <Input
-                      id="tags"
-                      name="tags"
-                      defaultValue={typedAsset.tags.join(", ")}
+                    <FormField
+                      label="Current Value"
+                      name="currentValue"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      defaultValue={typedAsset.currentValue || ""}
                     />
                   </div>
+
+                  <FormField
+                    label="Tags (comma-separated)"
+                    name="tags"
+                    defaultValue={typedAsset.tags.join(", ")}
+                  />
 
                   <div className="flex justify-end">
                     <Button type="submit" disabled={isSubmitting}>
@@ -564,6 +534,22 @@ export default function AssetDetailPage({ loaderData, actionData }: Route.Compon
                     <dd className="font-medium">{typedAsset.company?.name || "—"}</dd>
                   </div>
                   <div>
+                    <dt className="text-muted-foreground">Ownership Type</dt>
+                    <dd className="font-medium">
+                      {OWNERSHIP_TYPE_LABELS[typedAsset.ownershipType] || "—"}
+                      {typedAsset.ownershipType === "PRIVATE" && typedAsset.owner && (
+                        <span className="text-muted-foreground block text-xs">
+                          Owner: {typedAsset.owner.firstName} {typedAsset.owner.lastName}
+                        </span>
+                      )}
+                      {typedAsset.ownershipType === "OTHER" && typedAsset.otherOwnership && (
+                        <span className="text-muted-foreground block text-xs">
+                          {typedAsset.otherOwnership}
+                        </span>
+                      )}
+                    </dd>
+                  </div>
+                  <div>
                     <dt className="text-muted-foreground">Purchase Date</dt>
                     <dd className="font-medium">
                       {typedAsset.purchaseDate
@@ -575,7 +561,7 @@ export default function AssetDetailPage({ loaderData, actionData }: Route.Compon
                     <dt className="text-muted-foreground">Purchase Price</dt>
                     <dd className="font-medium">
                       {typedAsset.purchasePrice
-                        ? `$${typedAsset.purchasePrice.toLocaleString()}`
+                        ? `${typedAsset.purchasePrice.toLocaleString()}`
                         : "—"}
                     </dd>
                   </div>
@@ -583,7 +569,7 @@ export default function AssetDetailPage({ loaderData, actionData }: Route.Compon
                     <dt className="text-muted-foreground">Current Value</dt>
                     <dd className="font-medium">
                       {typedAsset.currentValue
-                        ? `$${typedAsset.currentValue.toLocaleString()}`
+                        ? `${typedAsset.currentValue.toLocaleString()}`
                         : "—"}
                     </dd>
                   </div>
@@ -592,7 +578,7 @@ export default function AssetDetailPage({ loaderData, actionData }: Route.Compon
                     <dd className="font-medium">
                       {typedAsset.tags.length > 0 ? (
                         <div className="flex flex-wrap gap-1">
-                          {typedAsset.tags.map((tag) => (
+                          {typedAsset.tags.map((tag: string) => (
                             <Badge key={tag} variant="outline" className="text-xs">
                               {tag}
                             </Badge>

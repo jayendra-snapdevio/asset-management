@@ -10,6 +10,7 @@ export interface AssetFilters {
   category?: string;
   sortBy?: string;
   sortOrder?: "asc" | "desc";
+  userId?: string; // Filter by user (assigned or created)
 }
 
 export interface AssetPagination {
@@ -49,6 +50,7 @@ export async function getAssets(
     category,
     sortBy = "createdAt",
     sortOrder = "desc",
+    userId,
   } = filters;
 
   const baseFilter = normalizeCompanyFilter(companyFilter);
@@ -65,6 +67,12 @@ export async function getAssets(
       ],
     }),
     ...(category && { category }),
+    ...(userId && {
+      OR: [
+        { assignments: { some: { userId, status: "ACTIVE" } } },
+        { createdById: userId },
+      ],
+    }),
   };
 
   // For categories, include all including retired
@@ -79,6 +87,13 @@ export async function getAssets(
       include: {
         createdBy: {
           select: { id: true, firstName: true, lastName: true, email: true },
+        },
+        company: {
+          select: { name: true },
+        },
+
+        owner: {
+          select: { firstName: true, lastName: true },
         },
         assignments: {
           where: { status: "ACTIVE" },
@@ -116,14 +131,24 @@ export async function getAssets(
  */
 export async function getAssetById(
   assetId: string,
-  companyFilter: { companyId: string | null } | { companyId: { in: string[] } }
+  companyFilter: { companyId: string | null } | { companyId: { in: string[] } },
+  checkAccessForUserId?: string // Optional: restrict access to this user
 ) {
   const baseFilter = normalizeCompanyFilter(companyFilter);
+  const where: Prisma.AssetWhereInput = {
+    id: assetId,
+    ...baseFilter,
+  };
+
+  if (checkAccessForUserId) {
+    where.OR = [
+      { assignments: { some: { userId: checkAccessForUserId, status: "ACTIVE" } } },
+      { createdById: checkAccessForUserId },
+    ];
+  }
+
   return prisma.asset.findFirst({
-    where: {
-      id: assetId,
-      ...baseFilter,
-    },
+    where,
     include: {
       createdBy: {
         select: { id: true, firstName: true, lastName: true, email: true },
@@ -160,42 +185,57 @@ export async function createAsset(
     location?: string;
     category?: string;
     tags?: string[];
+    imageUrl?: string;
+    ownershipType?: any;
+    ownerId?: string;
+    otherOwnership?: string;
   },
   companyId: string,
   createdById: string
 ) {
   // Create the asset
-  const asset = await prisma.asset.create({
-    data: {
-      name: data.name,
-      description: data.description || null,
-      serialNumber: data.serialNumber || null,
-      model: data.model || null,
-      manufacturer: data.manufacturer || null,
-      purchaseDate: data.purchaseDate || null,
-      purchasePrice: data.purchasePrice || null,
-      currentValue: data.currentValue || null,
-      location: data.location || null,
-      category: data.category || null,
-      tags: data.tags || [],
-      status: "AVAILABLE",
-      companyId,
-      createdById,
-    },
-  });
-
-  // Generate QR code
   try {
-    const qrCode = await generateQRCode(asset.id);
-    await prisma.asset.update({
-      where: { id: asset.id },
-      data: { qrCode },
+    const asset = await prisma.asset.create({
+      data: {
+        name: data.name,
+        description: data.description || null,
+        serialNumber: data.serialNumber || null,
+        model: data.model || null,
+        manufacturer: data.manufacturer || null,
+        purchaseDate: data.purchaseDate || null,
+        purchasePrice: data.purchasePrice || null,
+        currentValue: data.currentValue || null,
+        location: data.location || null,
+        category: data.category || null,
+        tags: data.tags || [],
+        imageUrl: data.imageUrl || null,
+        ownershipType: data.ownershipType || "COMPANY",
+        ownerId: data.ownerId || null,
+        otherOwnership: data.otherOwnership || null,
+        status: "AVAILABLE",
+        companyId,
+        createdById,
+      },
     });
-  } catch (error) {
-    console.error("Failed to generate QR code for asset:", asset.id, error);
-  }
 
-  return asset;
+    // Generate QR code
+    try {
+      const qrCode = await generateQRCode(asset.id);
+      await prisma.asset.update({
+        where: { id: asset.id },
+        data: { qrCode },
+      });
+    } catch (error) {
+      console.error("Failed to generate QR code for asset:", asset.id, error);
+    }
+
+    return { asset };
+  } catch (error: any) {
+    if (error.code === "P2002" && error.meta?.target?.includes("serialNumber")) {
+      return { error: "Asset with this serial number already exists" };
+    }
+    throw error;
+  }
 }
 
 /**
@@ -216,6 +256,10 @@ export async function updateAsset(
     status?: AssetStatus;
     category?: string;
     tags?: string[];
+    imageUrl?: string;
+    ownershipType?: any;
+    ownerId?: string;
+    otherOwnership?: string;
   },
   companyFilter: { companyId: string | null } | { companyId: { in: string[] } }
 ) {
@@ -242,30 +286,40 @@ export async function updateAsset(
     }
   }
 
-  const updatedAsset = await prisma.asset.update({
-    where: { id: assetId },
-    data: {
-      ...(data.name !== undefined && { name: data.name }),
-      ...(data.description !== undefined && { description: data.description || null }),
-      ...(data.serialNumber !== undefined && { serialNumber: data.serialNumber || null }),
-      ...(data.model !== undefined && { model: data.model || null }),
-      ...(data.manufacturer !== undefined && { manufacturer: data.manufacturer || null }),
-      ...(data.purchaseDate !== undefined && { purchaseDate: data.purchaseDate || null }),
-      ...(data.purchasePrice !== undefined && { purchasePrice: data.purchasePrice || null }),
-      ...(data.currentValue !== undefined && { currentValue: data.currentValue || null }),
-      ...(data.location !== undefined && { location: data.location || null }),
-      ...(data.status !== undefined && { status: data.status }),
-      ...(data.category !== undefined && { category: data.category || null }),
-      ...(data.tags !== undefined && { tags: data.tags }),
-    },
-    include: {
-      createdBy: {
-        select: { id: true, firstName: true, lastName: true, email: true },
+  try {
+    const updatedAsset = await prisma.asset.update({
+      where: { id: assetId },
+      data: {
+        ...(data.name !== undefined && { name: data.name }),
+        ...(data.description !== undefined && { description: data.description || null }),
+        ...(data.serialNumber !== undefined && { serialNumber: data.serialNumber || null }),
+        ...(data.model !== undefined && { model: data.model || null }),
+        ...(data.manufacturer !== undefined && { manufacturer: data.manufacturer || null }),
+        ...(data.purchaseDate !== undefined && { purchaseDate: data.purchaseDate || null }),
+        ...(data.purchasePrice !== undefined && { purchasePrice: data.purchasePrice || null }),
+        ...(data.currentValue !== undefined && { currentValue: data.currentValue || null }),
+        ...(data.location !== undefined && { location: data.location || null }),
+        ...(data.status !== undefined && { status: data.status }),
+        ...(data.category !== undefined && { category: data.category || null }),
+        ...(data.tags !== undefined && { tags: data.tags }),
+        ...(data.ownershipType !== undefined && { ownershipType: data.ownershipType }),
+        ...(data.ownerId !== undefined && { ownerId: data.ownerId || null }),
+        ...(data.otherOwnership !== undefined && { otherOwnership: data.otherOwnership || null }),
       },
-    },
-  });
+      include: {
+        createdBy: {
+          select: { id: true, firstName: true, lastName: true, email: true },
+        },
+      },
+    });
 
-  return { asset: updatedAsset };
+    return { asset: updatedAsset };
+  } catch (error: any) {
+    if (error.code === "P2002" && error.meta?.target?.includes("serialNumber")) {
+      return { error: "Asset with this serial number already exists" };
+    }
+    throw error;
+  }
 }
 
 /**

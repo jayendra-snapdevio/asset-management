@@ -2,7 +2,16 @@ import { useState, useRef } from "react";
 import { useFetcher } from "react-router";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent } from "~/components/ui/card";
-import { Upload, Trash2, Loader2, ImageIcon } from "lucide-react";
+import { Upload, Trash2, Loader2, ImageIcon, AlertCircle } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "~/components/ui/dialog";
 
 interface ImageUploadProps {
   assetId: string;
@@ -21,6 +30,7 @@ export function ImageUpload({
   const deleteFetcher = useFetcher();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const isUploading = fetcher.state === "submitting";
   const isDeleting = deleteFetcher.state === "submitting";
@@ -65,7 +75,6 @@ export function ImageUpload({
   };
 
   const handleDelete = () => {
-    if (!confirm("Are you sure you want to delete this image?")) return;
 
     deleteFetcher.submit(
       { intent: "delete-image" },
@@ -136,19 +145,47 @@ export function ImageUpload({
         {/* Delete button */}
         {canEdit && displayImageUrl && !isUploading && !isDeleting && (
           <div className="p-2 border-t">
-            <Button
-              type="button"
-              variant="destructive"
-              size="sm"
-              className="w-full"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDelete();
-              }}
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Remove Image
-            </Button>
+            <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  className="w-full"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Remove Image
+                </Button>
+              </DialogTrigger>
+              <DialogContent onClick={(e) => e.stopPropagation()}>
+                <DialogHeader>
+                  <DialogTitle>Remove Image</DialogTitle>
+                  <DialogDescription>
+                    Are you sure you want to remove this asset image? This action will permanently delete the image file.
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter className="gap-2 sm:gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setDeleteDialogOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={() => {
+                      handleDelete();
+                      setDeleteDialogOpen(false);
+                    }}
+                  >
+                    Remove Image
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
         )}
 

@@ -5,9 +5,16 @@ import { createSession, getCurrentUser } from "~/lib/session.server";
 import { prisma } from "~/lib/db.server";
 import { loginSchema } from "~/validators/auth.validator";
 import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
-import { Label } from "~/components/ui/label";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "~/components/ui/card";
+import { FormField } from "~/components/forms/form-field";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
+import { PasswordToggleField } from "~/components/forms/password-input";
 
 export function meta() {
   return [
@@ -20,7 +27,9 @@ export async function loader({ request }: Route.LoaderArgs) {
   // Redirect if already logged in
   const user = await getCurrentUser(request);
   if (user) {
-    return redirect(user.role === "USER" ? "/dashboard/my-assets" : "/dashboard");
+    return redirect(
+      user.role === "USER" ? "/dashboard/my-assets" : "/dashboard",
+    );
   }
   return null;
 }
@@ -40,7 +49,7 @@ export async function action({ request }: Route.ActionArgs) {
   if (!result.success) {
     return data<ActionResponse>(
       { errors: result.error.flatten().fieldErrors, values: rawData },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -51,7 +60,7 @@ export async function action({ request }: Route.ActionArgs) {
   if (!user) {
     return data<ActionResponse>(
       { error: "Invalid email or password", values: rawData },
-      { status: 401 }
+      { status: 401 },
     );
   }
 
@@ -60,15 +69,18 @@ export async function action({ request }: Route.ActionArgs) {
   if (!validPassword) {
     return data<ActionResponse>(
       { error: "Invalid email or password", values: rawData },
-      { status: 401 }
+      { status: 401 },
     );
   }
 
   // Check if active
   if (!user.isActive) {
     return data<ActionResponse>(
-      { error: "Your account has been deactivated. Please contact support.", values: rawData },
-      { status: 403 }
+      {
+        error: "Your account has been deactivated. Please contact support.",
+        values: rawData,
+      },
+      { status: 403 },
     );
   }
 
@@ -79,7 +91,8 @@ export async function action({ request }: Route.ActionArgs) {
   // Get redirect URL from query params or default based on role
   const url = new URL(request.url);
   const redirectTo = url.searchParams.get("redirectTo");
-  const defaultRedirect = user.role === "USER" ? "/dashboard/my-assets" : "/dashboard";
+  const defaultRedirect =
+    user.role === "USER" ? "/dashboard/my-assets" : "/dashboard";
 
   return redirect(redirectTo || defaultRedirect, {
     headers: { "Set-Cookie": cookie },
@@ -107,37 +120,19 @@ export default function LoginPage({ actionData }: Route.ComponentProps) {
             </div>
           )}
 
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              name="email"
-              type="email"
-              placeholder="you@example.com"
-              defaultValue={values?.email}
-              required
-              autoComplete="email"
-            />
-            {errors?.email && (
-              <p className="text-sm text-red-500">{errors.email[0]}</p>
-            )}
-          </div>
+          <FormField
+            label="Email"
+            name="email"
+            type="email"
+            placeholder="you@example.com"
+            defaultValue={values?.email}
+            required
+            autoComplete="email"
+            error={errors?.email}
+          />
 
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              name="password"
-              type="password"
-              placeholder="••••••••"
-              required
-              autoComplete="current-password"
-            />
-            {errors?.password && (
-              <p className="text-sm text-red-500">{errors.password[0]}</p>
-            )}
-          </div>
-
+          <PasswordToggleField name="password" label="Password" errors={errors?.password} />
+      
           <div className="flex justify-end">
             <Link
               to="/forgot-password"

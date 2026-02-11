@@ -1,5 +1,18 @@
-import type { Role, AssetStatus, AssignmentStatus } from "@prisma/client";
+import type { Role, AssetStatus, AssignmentStatus, OwnershipType } from "@prisma/client";
 import type { SelectOption } from "~/types";
+
+// Ownership type labels and options
+export const OWNERSHIP_TYPE_LABELS: Record<OwnershipType, string> = {
+  COMPANY: "Asset Company",
+  PRIVATE: "Asset Private",
+  OTHER: "Asset Other",
+};
+
+export const OWNERSHIP_TYPE_OPTIONS: SelectOption[] = [
+  { value: "COMPANY", label: "Asset Company" },
+  { value: "PRIVATE", label: "Asset Private" },
+  { value: "OTHER", label: "Asset Other" },
+];
 
 // Role labels and options
 export const ROLE_LABELS: Record<Role, string> = {

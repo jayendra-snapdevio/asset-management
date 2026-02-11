@@ -7,10 +7,9 @@ import { updateProfileSchema } from "~/validators/user.validator";
 import { changePasswordSchema } from "~/validators/auth.validator";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
-import { Label } from "~/components/ui/label";
-import { Separator } from "~/components/ui/separator";
-
+import { FormField } from "~/components/forms/form-field";
+import { PasswordToggleField } from "~/components/forms/password-input";
+import { SuccessMessage } from "~/components/ui/success-message";
 export function meta() {
   return [
     { title: "Profile - Asset Management" },
@@ -118,7 +117,12 @@ export async function action({ request }: Route.ActionArgs) {
 export default function ProfilePage({ loaderData, actionData }: Route.ComponentProps) {
   const { user } = loaderData;
   const navigation = useNavigation();
-  const isSubmitting = navigation.state === "submitting";
+  const isProfileSubmitting =
+    navigation.state === "submitting" &&
+    navigation.formData?.get("intent") === "updateProfile";
+  const isPasswordSubmitting =
+    navigation.state === "submitting" &&
+    navigation.formData?.get("intent") === "changePassword";
   
   const profileSuccess = actionData?.intent === "updateProfile" && actionData?.success;
   const passwordSuccess = actionData?.intent === "changePassword" && actionData?.success;
@@ -126,7 +130,7 @@ export default function ProfilePage({ loaderData, actionData }: Route.ComponentP
   const passwordErrors = actionData?.intent === "changePassword" ? actionData?.errors : undefined;
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Profile</h1>
         <p className="text-muted-foreground">
@@ -134,7 +138,9 @@ export default function ProfilePage({ loaderData, actionData }: Route.ComponentP
         </p>
       </div>
 
+<div className="flex flex-col gap-6 lg:flex-row items-start">
       {/* Profile Information */}
+      <div className="w-full lg:w-1/2">
       <Card>
         <CardHeader>
           <CardTitle>Personal Information</CardTitle>
@@ -145,63 +151,45 @@ export default function ProfilePage({ loaderData, actionData }: Route.ComponentP
             <input type="hidden" name="intent" value="updateProfile" />
             
             {profileSuccess && (
-              <div className="p-3 text-sm text-green-600 bg-green-50 border border-green-200 rounded-md">
-                {actionData?.message}
-              </div>
+              <SuccessMessage message={actionData?.message} />
             )}
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="firstName">First name</Label>
-                <Input
-                  id="firstName"
-                  name="firstName"
-                  defaultValue={user.firstName}
-                  required
-                />
-                {profileErrors?.firstName && (
-                  <p className="text-sm text-red-500">{profileErrors.firstName[0]}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="lastName">Last name</Label>
-                <Input
-                  id="lastName"
-                  name="lastName"
-                  defaultValue={user.lastName}
-                  required
-                />
-                {profileErrors?.lastName && (
-                  <p className="text-sm text-red-500">{profileErrors.lastName[0]}</p>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                defaultValue={user.email}
+          
+              <FormField
+                label="First name"
+                name="firstName"
+                defaultValue={user.firstName}
                 required
+                error={profileErrors?.firstName}
               />
-              {profileErrors?.email && (
-                <p className="text-sm text-red-500">{profileErrors.email[0]}</p>
-              )}
-            </div>
 
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Saving..." : "Save changes"}
+              <FormField
+                label="Last name"
+                name="lastName"
+                defaultValue={user.lastName}
+                required
+                error={profileErrors?.lastName}
+              />
+           
+            <FormField
+              label="Email"
+              name="email"
+              type="email"
+              defaultValue={user.email}
+              required
+              error={profileErrors?.email}
+            />
+
+            <Button type="submit" disabled={isProfileSubmitting}>
+              {isProfileSubmitting ? "Saving..." : "Save changes"}
             </Button>
           </Form>
         </CardContent>
       </Card>
-
-      <Separator />
+      </div>
 
       {/* Change Password */}
+      <div className="w-full lg:w-1/2">
       <Card>
         <CardHeader>
           <CardTitle>Change Password</CardTitle>
@@ -212,56 +200,36 @@ export default function ProfilePage({ loaderData, actionData }: Route.ComponentP
             <input type="hidden" name="intent" value="changePassword" />
             
             {passwordSuccess && (
-              <div className="p-3 text-sm text-green-600 bg-green-50 border border-green-200 rounded-md">
-                {actionData?.message}
-              </div>
+              <SuccessMessage message={actionData?.message} />
             )}
 
-            <div className="space-y-2">
-              <Label htmlFor="currentPassword">Current password</Label>
-              <Input
-                id="currentPassword"
-                name="currentPassword"
-                type="password"
-                required
-              />
-              {passwordErrors?.currentPassword && (
-                <p className="text-sm text-red-500">{passwordErrors.currentPassword[0]}</p>
-              )}
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="newPassword">New password</Label>
-              <Input
-                id="newPassword"
-                name="newPassword"
-                type="password"
-                required
-              />
-              {passwordErrors?.newPassword && (
-                <p className="text-sm text-red-500">{passwordErrors.newPassword[0]}</p>
-              )}
-            </div>
+            <PasswordToggleField
+              name="currentPassword"
+              label="Current password"
+              errors={passwordErrors?.currentPassword}
+            />
 
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm new password</Label>
-              <Input
-                id="confirmPassword"
-                name="confirmPassword"
-                type="password"
-                required
-              />
-              {passwordErrors?.confirmPassword && (
-                <p className="text-sm text-red-500">{passwordErrors.confirmPassword[0]}</p>
-              )}
-            </div>
+            <PasswordToggleField
+              name="newPassword"
+              label="New password"
+              errors={passwordErrors?.newPassword}
+            />
 
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Changing..." : "Change password"}
+            <PasswordToggleField
+              name="confirmPassword"
+              label="Confirm new password"
+              errors={passwordErrors?.confirmPassword}
+            />
+
+            <Button type="submit" disabled={isPasswordSubmitting}>
+              {isPasswordSubmitting ? "Changing..." : "Change password"}
             </Button>
           </Form>
         </CardContent>
       </Card>
+ </div>     
+</div>
     </div>
   );
 }
