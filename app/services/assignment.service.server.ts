@@ -429,3 +429,38 @@ export async function getUserAssignments(
     },
   });
 }
+/**
+ * Delete an assignment record
+ */
+export async function deleteAssignment(
+  assignmentId: string,
+  companyFilter: CompanyFilter
+) {
+  const assetFilter = normalizeAssetCompanyFilter(companyFilter);
+  
+  const assignment = await prisma.assignment.findFirst({
+    where: {
+      id: assignmentId,
+      asset: assetFilter,
+    },
+  });
+
+  if (!assignment) {
+    return { error: "Assignment not found or unauthorized" };
+  }
+
+  // If assignment was active, return asset to available
+  if (assignment.status === "ACTIVE") {
+    await prisma.$transaction([
+      prisma.assignment.delete({ where: { id: assignmentId } }),
+      prisma.asset.update({
+        where: { id: assignment.assetId },
+        data: { status: "AVAILABLE" },
+      }),
+    ]);
+  } else {
+    await prisma.assignment.delete({ where: { id: assignmentId } });
+  }
+
+  return { success: true };
+}

@@ -6,20 +6,15 @@ import { createAsset } from "~/services/asset.service.server";
 import { getCompaniesByOwner } from "~/services/company.service.server";
 import { createAssetSchema } from "~/validators/asset.validator";
 import { prisma } from "~/lib/db.server";
+import { uploadFile } from "~/lib/upload.server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
-import { Label } from "~/components/ui/label";
-import { Textarea } from "~/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "~/components/ui/select";
+import { FormField } from "~/components/forms/form-field";
+import { FormTextarea } from "~/components/forms/form-textarea";
+import { FormSelect } from "~/components/forms/form-select";
 import { ArrowLeft, Loader2 } from "lucide-react";
-import { ASSET_CATEGORIES } from "~/constants";
+import { ASSET_CATEGORIES, OWNERSHIP_TYPE_OPTIONS } from "~/constants";
+import { getUsers } from "~/services/user.service.server";
 
 export function meta() {
   return [{ title: "Add New Asset - Asset Management" }];
@@ -44,13 +39,32 @@ export async function loader({ request }: Route.LoaderArgs) {
     }
   }
   
-  return { user, companies };
+  // Fetch users for PRIVATE ownership type selection
+  const { users } = await getUsers(user, { page: 1, limit: 1000 });
+  const userOptions = users.map(u => ({ label: `${u.firstName} ${u.lastName} (${u.email})`, value: u.id }));
+  
+  return { user, companies, userOptions };
 }
 
 export async function action({ request }: Route.ActionArgs) {
   const user = await requireRole(request, ["OWNER", "ADMIN"]);
 
   const formData = await request.formData();
+  
+  const file = formData.get("image") as File | null;
+  let imageUrl: string | undefined = undefined;
+
+  if (file && file.size > 0 && file.name) {
+    const uploadResult = await uploadFile(file, "assets");
+    if (!uploadResult.success) {
+      return data(
+        { error: uploadResult.error, errors: undefined },
+        { status: 400 }
+      );
+    }
+    imageUrl = uploadResult.url;
+  }
+
   const rawData = Object.fromEntries(formData);
   
   // Get companyId from form (for OWNER) or from user (for ADMIN)
@@ -85,42 +99,59 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   // Add companyId for validation
-  const dataWithCompany = { ...rawData, companyId };
-  const result = createAssetSchema.safeParse(dataWithCompany);
+  const dataWithCompany = { 
+    ...rawData, 
+    companyId,
+    imageUrl 
+  };
+  
+  const validationResult = createAssetSchema.safeParse(dataWithCompany);
 
-  if (!result.success) {
+  if (!validationResult.success) {
     return data(
-      { errors: result.error.flatten().fieldErrors, error: undefined },
+      { errors: validationResult.error.flatten().fieldErrors, error: undefined },
       { status: 400 }
     );
   }
 
-  const asset = await createAsset(
+  const result = await createAsset(
     {
-      name: result.data.name,
-      description: result.data.description,
-      serialNumber: result.data.serialNumber,
-      model: result.data.model,
-      manufacturer: result.data.manufacturer,
-      purchaseDate: result.data.purchaseDate,
-      purchasePrice: result.data.purchasePrice,
-      currentValue: result.data.currentValue,
-      location: result.data.location,
-      category: result.data.category,
-      tags: result.data.tags,
+      name: validationResult.data.name,
+      description: validationResult.data.description,
+      serialNumber: validationResult.data.serialNumber,
+      model: validationResult.data.model,
+      manufacturer: validationResult.data.manufacturer,
+      purchaseDate: validationResult.data.purchaseDate,
+      purchasePrice: validationResult.data.purchasePrice,
+      currentValue: validationResult.data.currentValue,
+      location: validationResult.data.location,
+      category: validationResult.data.category,
+      tags: validationResult.data.tags,
+      imageUrl: validationResult.data.imageUrl,
+      ownershipType: validationResult.data.ownershipType,
+      ownerId: validationResult.data.ownerId,
+      otherOwnership: validationResult.data.otherOwnership,
     },
     companyId,
     user.id
   );
 
-  return redirect(`/dashboard/assets/${asset.id}`);
+  if (result.error) {
+    return data(
+      { error: result.error, errors: undefined },
+      { status: 400 }
+    );
+  }
+
+  return redirect(`/dashboard/assets/${result.asset!.id}`);
 }
 
 export default function NewAssetPage({ loaderData, actionData }: Route.ComponentProps) {
-  const { user, companies } = loaderData;
+  const { user, companies, userOptions } = loaderData;
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
   const [category, setCategory] = useState<string>("");
+  const [ownershipType, setOwnershipType] = useState<string>("COMPANY");
   const [selectedCompany, setSelectedCompany] = useState<string>(
     companies.length === 1 ? companies[0].id : ""
   );
@@ -134,10 +165,8 @@ export default function NewAssetPage({ loaderData, actionData }: Route.Component
           </Button>
         </Link>
         <div>
-          <h1 className="text-3xl font-bold">Add New Asset</h1>
-          <p className="text-muted-foreground">
-            Create a new asset to track in your organization
-          </p>
+          <h1 className="text-3xl font-bold">New Asset</h1>
+          <p className="text-muted-foreground">Create a new asset in the system</p>
         </div>
       </div>
 
@@ -155,7 +184,7 @@ export default function NewAssetPage({ loaderData, actionData }: Route.Component
           </CardContent>
         </Card>
       ) : (
-        <Card className="max-w-2xl">
+        <Card className="w-full">
           <CardHeader>
             <CardTitle>Asset Details</CardTitle>
             <CardDescription>
@@ -163,7 +192,7 @@ export default function NewAssetPage({ loaderData, actionData }: Route.Component
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Form method="post" className="space-y-6">
+            <Form method="post" encType="multipart/form-data" className="space-y-6">
               {actionData?.error && (
                 <div className="p-3 bg-destructive/10 text-destructive rounded-md text-sm">
                   {actionData.error}
@@ -172,224 +201,192 @@ export default function NewAssetPage({ loaderData, actionData }: Route.Component
 
               {/* Company Selector (for OWNER with multiple companies) */}
               {user.role === "OWNER" && companies.length > 1 && (
-                <div className="space-y-2">
-                  <Label htmlFor="companyId">Company *</Label>
-                  <Select
-                    value={selectedCompany}
-                    onValueChange={setSelectedCompany}
-                    name="companyId"
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a company" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {companies.map((company) => (
-                        <SelectItem key={company.id} value={company.id}>
-                          {company.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <input type="hidden" name="companyId" value={selectedCompany} />
-                </div>
+                <FormSelect
+                  label="Company"
+                  name="companyId"
+                  value={selectedCompany}
+                  onValueChange={setSelectedCompany}
+                  placeholder="Select a company"
+                  required
+                  options={companies.map(c => ({ label: c.name, value: c.id }))}
+                />
               )}
 
-              {/* Hidden companyId for single company */}
-              {(user.role !== "OWNER" || companies.length === 1) && (
+              {/* Hidden companyId for single company or admin */}
+              {!(user.role === "OWNER" && companies.length > 1) && (
                 <input type="hidden" name="companyId" value={companies[0]?.id || ""} />
               )}
 
-            {/* Basic Info */}
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Asset Name *</Label>
-                <Input
-                  id="name"
+              {/* Basic Info */}
+              <div className="space-y-4">
+            
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  label="Asset Name"
                   name="name"
                   placeholder="e.g., MacBook Pro 16-inch"
                   required
+                  error={actionData?.errors?.name}
                 />
-                {actionData?.errors?.name && (
-                  <p className="text-sm text-destructive">{actionData.errors.name[0]}</p>
-                )}
+
+                <FormField
+                  label="Asset Image"
+                  name="image"
+                  type="file"
+                  accept="image/*"
+                  helperText="Optional. Max 5MB. Formats: JPG, PNG, GIF, WebP."
+                />
+              </div>
+        
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    label="Serial Number"
+                    name="serialNumber"
+                    placeholder="e.g., ABC123XYZ"
+                    error={actionData?.errors?.serialNumber}
+                  />
+
+                  <FormSelect
+                    label="Category"
+                    name="category"
+                    value={category}
+                    onValueChange={setCategory}
+                    placeholder="Select category"
+                    options={ASSET_CATEGORIES}
+                    error={actionData?.errors?.category}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormSelect
+                    label="Ownership Type"
+                    name="ownershipType"
+                    value={ownershipType}
+                    onValueChange={setOwnershipType}
+                    placeholder="Select ownership type"
+                    required
+                    options={OWNERSHIP_TYPE_OPTIONS}
+                    error={actionData?.errors?.ownershipType}
+                  />
+
+                  {ownershipType === "PRIVATE" && (
+                    <FormSelect
+                      label="Select Owner (User)"
+                      name="ownerId"
+                      placeholder="Select user"
+                      required
+                      options={userOptions}
+                      error={actionData?.errors?.ownerId}
+                    />
+                  )}
+
+                  {ownershipType === "OTHER" && (
+                    <FormField
+                      label="Ownership Details"
+                      name="otherOwnership"
+                      placeholder="e.g., Leased from Company X"
+                      required
+                      error={actionData?.errors?.otherOwnership}
+                    />
+                  )}
+
+                  <FormField
+                    label="Tags (comma-separated)"
+                    name="tags"
+                    placeholder="e.g., laptop, work, developer"
+                    helperText="Add tags to help organize and search for assets"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    label="Model"
+                    name="model"
+                    placeholder="e.g., MBP16-2023"
+                    error={actionData?.errors?.model}
+                  />
+
+                  <FormField
+                    label="Manufacturer"
+                    name="manufacturer"
+                    placeholder="e.g., Apple"
+                    error={actionData?.errors?.manufacturer}
+                  />
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
+              {/* Purchase Info */}
+              <div className="space-y-4 pt-4 border-t">
+                <h3 className="font-medium">Purchase Information</h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    label="Purchase Date"
+                    name="purchaseDate"
+                    type="date"
+                    error={actionData?.errors?.purchaseDate}
+                  />
+
+                  <FormField
+                    label="Purchase Price"
+                    name="purchasePrice"
+                    type="number"
+                    step="1"
+                    min="0"
+                    placeholder="00"
+                    error={actionData?.errors?.purchasePrice}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    label="Current Value"
+                    name="currentValue"
+                    type="number"
+                    step="1"
+                    min="0"
+                    placeholder="00"
+                    error={actionData?.errors?.currentValue}
+                  />
+
+                  <FormField
+                    label="Location"
+                    name="location"
+                    placeholder="e.g., Main Office, Floor 2"
+                    error={actionData?.errors?.location}
+                  />
+                </div>
+              </div>
+
+                <FormTextarea
+                  label="Description"
                   name="description"
                   placeholder="Describe the asset..."
                   rows={3}
+                  error={actionData?.errors?.description}
                 />
-                {actionData?.errors?.description && (
-                  <p className="text-sm text-destructive">{actionData.errors.description[0]}</p>
-                )}
-              </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="serialNumber">Serial Number</Label>
-                  <Input
-                    id="serialNumber"
-                    name="serialNumber"
-                    placeholder="e.g., ABC123XYZ"
-                  />
-                  {actionData?.errors?.serialNumber && (
-                    <p className="text-sm text-destructive">{actionData.errors.serialNumber[0]}</p>
+              {/* Actions */}
+              <div className="flex justify-end gap-4 pt-4">
+                <Link to="/dashboard/assets">
+                  <Button type="button" variant="outline">
+                    Cancel
+                  </Button>
+                </Link>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    "Create Asset"
                   )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="category">Category</Label>
-                  <Select
-                    value={category}
-                    onValueChange={setCategory}
-                    name="category"
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ASSET_CATEGORIES.map((cat) => (
-                        <SelectItem key={cat.value} value={cat.value}>
-                          {cat.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {/* Hidden input to ensure value is submitted */}
-                  <input type="hidden" name="category" value={category} />
-                  {actionData?.errors?.category && (
-                    <p className="text-sm text-destructive">{actionData.errors.category[0]}</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="model">Model</Label>
-                  <Input
-                    id="model"
-                    name="model"
-                    placeholder="e.g., MBP16-2023"
-                  />
-                  {actionData?.errors?.model && (
-                    <p className="text-sm text-destructive">{actionData.errors.model[0]}</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="manufacturer">Manufacturer</Label>
-                  <Input
-                    id="manufacturer"
-                    name="manufacturer"
-                    placeholder="e.g., Apple"
-                  />
-                  {actionData?.errors?.manufacturer && (
-                    <p className="text-sm text-destructive">{actionData.errors.manufacturer[0]}</p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Purchase Info */}
-            <div className="space-y-4 pt-4 border-t">
-              <h3 className="font-medium">Purchase Information</h3>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="purchaseDate">Purchase Date</Label>
-                  <Input
-                    id="purchaseDate"
-                    name="purchaseDate"
-                    type="date"
-                  />
-                  {actionData?.errors?.purchaseDate && (
-                    <p className="text-sm text-destructive">{actionData.errors.purchaseDate[0]}</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="purchasePrice">Purchase Price ($)</Label>
-                  <Input
-                    id="purchasePrice"
-                    name="purchasePrice"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="0.00"
-                  />
-                  {actionData?.errors?.purchasePrice && (
-                    <p className="text-sm text-destructive">{actionData.errors.purchasePrice[0]}</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="currentValue">Current Value ($)</Label>
-                  <Input
-                    id="currentValue"
-                    name="currentValue"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="0.00"
-                  />
-                  {actionData?.errors?.currentValue && (
-                    <p className="text-sm text-destructive">{actionData.errors.currentValue[0]}</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="location">Location</Label>
-                  <Input
-                    id="location"
-                    name="location"
-                    placeholder="e.g., Main Office, Floor 2"
-                  />
-                  {actionData?.errors?.location && (
-                    <p className="text-sm text-destructive">{actionData.errors.location[0]}</p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Tags */}
-            <div className="space-y-2 pt-4 border-t">
-              <Label htmlFor="tags">Tags (comma-separated)</Label>
-              <Input
-                id="tags"
-                name="tags"
-                placeholder="e.g., laptop, work, developer"
-              />
-              <p className="text-xs text-muted-foreground">
-                Add tags to help organize and search for assets
-              </p>
-            </div>
-
-            {/* Actions */}
-            <div className="flex justify-end gap-4 pt-4">
-              <Link to="/dashboard/assets">
-                <Button type="button" variant="outline">
-                  Cancel
                 </Button>
-              </Link>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Creating...
-                  </>
-                ) : (
-                  "Create Asset"
-                )}
-              </Button>
-            </div>
-          </Form>
-        </CardContent>
-      </Card>
+              </div>
+            </Form>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

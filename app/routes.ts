@@ -36,6 +36,8 @@ export default [
     route("dashboard/assignments/new", "routes/_dashboard.assignments.new.tsx"),
     route("dashboard/assignments/:id", "routes/_dashboard.assignments.$id.tsx"),
     route("dashboard/my-assets", "routes/_dashboard.my-assets.tsx"),
+    route("dashboard/user/assets/new", "routes/_dashboard.user.assets.new.tsx"),
+    route("dashboard/user/assignments/new", "routes/_dashboard.user.assignments.new.tsx"),
     route("dashboard/profile", "routes/_dashboard.profile.tsx"),
     route("dashboard/settings", "routes/_dashboard.settings.tsx"),
   ]),

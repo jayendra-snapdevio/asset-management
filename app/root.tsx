@@ -9,6 +9,7 @@ import {
 
 import type { Route } from "./+types/root";
 import "./app.css";
+import { getTheme, type Theme } from "./lib/theme.server";
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -23,16 +24,40 @@ export const links: Route.LinksFunction = () => [
   },
 ];
 
+import { useRouteLoaderData } from "react-router";
+
+export const loader = async ({ request }: Route.LoaderArgs) => {
+  const theme = await getTheme(request);
+  return { theme };
+};
+
 export function Layout({ children }: { children: React.ReactNode }) {
+  const data = useRouteLoaderData("root") as { theme: Theme } | undefined;
+  const theme = data?.theme || "system";
+
   return (
-    <html lang="en">
+    <html lang="en" className={theme === "dark" ? "dark" : ""}>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <Meta />
         <Links />
+        {theme === "system" && (
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `
+                (function() {
+                  const theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+                  if (theme === "dark") {
+                    document.documentElement.classList.add("dark");
+                  }
+                })();
+              `,
+            }}
+          />
+        )}
       </head>
-      <body className="min-h-screen bg-background font-sans antialiased">
+      <body className="min-h-screen bg-background font-sans antialiased text-foreground">
         {children}
         <ScrollRestoration />
         <Scripts />

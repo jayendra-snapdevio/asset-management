@@ -1,14 +1,32 @@
 import { useState } from "react";
-import { data, redirect, Form, useSearchParams, Link, useNavigation } from "react-router";
+import {
+  data,
+  redirect,
+  Form,
+  useSearchParams,
+  Link,
+  useNavigation,
+} from "react-router";
 import type { Route } from "./+types/_dashboard.companies";
 import { requireRole } from "~/lib/session.server";
 import { handleError } from "~/lib/errors.server";
-import { getCompaniesByOwner, createCompany } from "~/services/company.service.server";
+import {
+  getCompaniesByOwner,
+  createCompany,
+  deleteCompany,
+} from "~/services/company.service.server";
 import { createCompanySchema } from "~/validators/company.validator";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
-import { Label } from "~/components/ui/label";
+import { FormField } from "~/components/forms/form-field";
+import type { CompanyListItem } from "~/types";
 import {
   Dialog,
   DialogContent,
@@ -27,7 +45,18 @@ import {
   TableRow,
 } from "~/components/ui/table";
 import { Badge } from "~/components/ui/badge";
-import { Building2, Plus, Search, Users, Package, ChevronLeft, ChevronRight, Eye } from "lucide-react";
+import { Pagination } from "~/components/shared/Pagination";
+import {
+  Building2,
+  Plus,
+  Search,
+  Users,
+  Package,
+  Eye,
+  Edit2,
+  Trash2,
+} from "lucide-react";
+
 
 export function meta() {
   return [{ title: "Companies - Asset Management" }];
@@ -39,9 +68,13 @@ export async function loader({ request }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const page = parseInt(url.searchParams.get("page") || "1");
   const search = url.searchParams.get("search") || "";
-  const limit = 10;
+  const limit = parseInt(url.searchParams.get("limit") || "10");
 
-  const { companies, pagination } = await getCompaniesByOwner(user.id, { page, limit, search });
+  const { companies, pagination } = await getCompaniesByOwner(user.id, {
+    page,
+    limit,
+    search,
+  });
 
   return { user, companies, pagination, search };
 }
@@ -49,11 +82,32 @@ export async function loader({ request }: Route.LoaderArgs) {
 export async function action({ request }: Route.ActionArgs) {
   const user = await requireRole(request, ["OWNER"]);
   const formData = await request.formData();
+  const intent = formData.get("intent");
   const rawData = Object.fromEntries(formData);
+
+  if (intent === "delete") {
+    const companyId = formData.get("companyId") as string;
+    if (!companyId) {
+      return data({ error: "Company ID is required", success: false }, { status: 400 });
+    }
+    
+    try {
+      const result = await deleteCompany(companyId, user.id);
+      if (!result) {
+        return data({ error: "Failed to delete company", success: false }, { status: 400 });
+      }
+      return data({ success: true, message: "Company deleted successfully" });
+    } catch (error) {
+      return handleError(error);
+    }
+  }
 
   const result = createCompanySchema.safeParse(rawData);
   if (!result.success) {
-    return data({ errors: result.error.flatten().fieldErrors, success: false }, { status: 400 });
+    return data(
+      { errors: result.error.flatten().fieldErrors, success: false },
+      { status: 400 },
+    );
   }
 
   try {
@@ -64,8 +118,12 @@ export async function action({ request }: Route.ActionArgs) {
   }
 }
 
-export default function CompaniesPage({ loaderData, actionData }: Route.ComponentProps) {
+export default function CompaniesPage({
+  loaderData,
+  actionData,
+}: Route.ComponentProps) {
   const { companies, pagination, search } = loaderData;
+  const typedCompanies = companies as CompanyListItem[];
   const [searchParams, setSearchParams] = useSearchParams();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const navigation = useNavigation();
@@ -84,8 +142,20 @@ export default function CompaniesPage({ loaderData, actionData }: Route.Componen
     setSearchParams(params);
   };
 
+  const hasFilters = search;
+
   return (
     <div className="space-y-6">
+      {actionData && "error" in actionData && actionData.error && (
+        <div className="bg-destructive/15 border border-destructive text-destructive px-4 py-3 rounded-md">
+          {actionData.error as string}
+        </div>
+      )}
+      {actionData && "success" in actionData && actionData.success && (
+        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-md">
+          {"message" in actionData ? (actionData.message as string) : "Action completed successfully"}
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Companies</h1>
@@ -109,61 +179,44 @@ export default function CompaniesPage({ loaderData, actionData }: Route.Componen
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Company Name *</Label>
-                  <Input
-                    id="name"
-                    name="name"
-                    placeholder="Enter company name"
-                    required
-                  />
-                  {actionData && "errors" in actionData && actionData.errors?.name && (
-                    <p className="text-sm text-destructive">{actionData.errors.name[0]}</p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    placeholder="company@example.com"
-                  />
-                  {actionData && "errors" in actionData && actionData.errors?.email && (
-                    <p className="text-sm text-destructive">{actionData.errors.email[0]}</p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone</Label>
-                  <Input
-                    id="phone"
-                    name="phone"
-                    placeholder="+1 234 567 890"
-                  />
-                  {actionData && "errors" in actionData && actionData.errors?.phone && (
-                    <p className="text-sm text-destructive">{actionData.errors.phone[0]}</p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="address">Address</Label>
-                  <Input
-                    id="address"
-                    name="address"
-                    placeholder="123 Main St, City"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="website">Website</Label>
-                  <Input
-                    id="website"
-                    name="website"
-                    type="url"
-                    placeholder="https://example.com"
-                  />
-                </div>
+                <FormField
+                  label="Company Name"
+                  name="name"
+                  placeholder="Enter company name"
+                  required
+                  error={actionData && "errors" in actionData ? (actionData.errors as any)?.name : undefined}
+                />
+                <FormField
+                  label="Email"
+                  name="email"
+                  type="email"
+                  placeholder="company@example.com"
+                  error={actionData && "errors" in actionData ? (actionData.errors as any)?.email : undefined}
+                />
+                <FormField
+                  label="Phone"
+                  name="phone"
+                  placeholder="+1 234 567 890"
+                  error={actionData && "errors" in actionData ? (actionData.errors as any)?.phone : undefined}
+                />
+                <FormField
+                  label="Address"
+                  name="address"
+                  placeholder="123 Main St, City"
+                />
+                <FormField
+                  label="Website"
+                  name="website"
+                  type="url"
+                  placeholder="https://example.com"
+                />
               </div>
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsDialogOpen(false)}
+                >
                   Cancel
                 </Button>
                 <Button type="submit" disabled={isSubmitting}>
@@ -229,7 +282,8 @@ export default function CompaniesPage({ loaderData, actionData }: Route.Componen
           <CardHeader>
             <CardTitle>Company List</CardTitle>
             <CardDescription>
-              {pagination.total} {pagination.total === 1 ? "company" : "companies"} total
+              {pagination.total}{" "}
+              {pagination.total === 1 ? "company" : "companies"} total
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -241,7 +295,7 @@ export default function CompaniesPage({ loaderData, actionData }: Route.Componen
                   <TableHead>Phone</TableHead>
                   <TableHead className="text-center">Users</TableHead>
                   <TableHead className="text-center">Assets</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -249,8 +303,13 @@ export default function CompaniesPage({ loaderData, actionData }: Route.Componen
                   <TableRow key={company.id}>
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
-                        <Building2 className="h-4 w-4 text-muted-foreground" />
-                        {company.name}
+                        <Link
+                          to={`/dashboard/companies/${company.id}`}
+                          className="hover:underline flex items-center gap-2"
+                        >
+                          <Building2 className="h-4 w-4 text-muted-foreground" />
+                          {company.name}
+                        </Link>
                       </div>
                     </TableCell>
                     <TableCell>{company.email || "-"}</TableCell>
@@ -267,49 +326,69 @@ export default function CompaniesPage({ loaderData, actionData }: Route.Componen
                         {company._count.assets}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right">
-                      <Button asChild variant="ghost" size="sm">
-                        <Link to={`/dashboard/companies/${company.id}`}>
-                          <Eye className="h-4 w-4 mr-1" />
-                          View
-                        </Link>
-                      </Button>
+                    <TableCell className="text-center">
+                      <div className="flex justify-start gap-1">
+                        <Button asChild variant="ghost" size="icon" className="h-8 w-8" title="View details">
+                          <Link to={`/dashboard/companies/${company.id}`}>
+                            <Eye className="h-3 w-3" />
+                          </Link>
+                        </Button>
+                        <Button asChild variant="ghost" size="icon" className="h-8 w-8" title="Edit company">
+                          <Link to={`/dashboard/companies/${company.id}`}>
+                            <Edit2 className="h-3 w-3" />
+                          </Link>
+                        </Button>
+                        
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" title="Delete company">
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Delete Company</DialogTitle>
+                              <DialogDescription>
+                                Are you sure you want to delete {company.name}? This will mark the company as inactive. 
+                                {company._count.users > 0 && ` This company has ${company._count.users} users.`}
+                                {company._count.assets > 0 && ` This company has ${company._count.assets} assets.`}
+                              </DialogDescription>
+                            </DialogHeader>
+                            <DialogFooter className="mt-4">
+                              <Form method="post">
+                                <input type="hidden" name="intent" value="delete" />
+                                <input type="hidden" name="companyId" value={company.id} />
+                                <div className="flex gap-2 justify-end">
+                                  <DialogTrigger asChild>
+                                    <Button type="button" variant="outline">Cancel</Button>
+                                  </DialogTrigger>
+                                  <Button type="submit" variant="destructive" disabled={isSubmitting}>
+                                    {isSubmitting ? "Deleting..." : "Delete Company"}
+                                  </Button>
+                                </div>
+                              </Form>
+                            </DialogFooter>
+                          </DialogContent>
+                        </Dialog>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
 
-            {/* Pagination */}
-            {pagination.totalPages > 1 && (
-              <div className="flex items-center justify-between mt-4 pt-4 border-t">
-                <p className="text-sm text-muted-foreground">
-                  Showing {(pagination.page - 1) * pagination.limit + 1} to{" "}
-                  {Math.min(pagination.page * pagination.limit, pagination.total)} of{" "}
-                  {pagination.total} results
-                </p>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => goToPage(pagination.page - 1)}
-                    disabled={pagination.page === 1}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                    Previous
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => goToPage(pagination.page + 1)}
-                    disabled={pagination.page === pagination.totalPages}
-                  >
-                    Next
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            )}
+            <Pagination
+              pagination={pagination}
+              onPageChange={goToPage}
+              onLimitChange={(value) => {
+                const params = new URLSearchParams(searchParams);
+                params.set("limit", value);
+                params.set("page", "1");
+                setSearchParams(params);
+              }}
+              itemName="results"
+              className="mt-4"
+            />
           </CardContent>
         </Card>
       )}

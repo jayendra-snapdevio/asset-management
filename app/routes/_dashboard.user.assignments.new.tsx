@@ -1,13 +1,11 @@
-import { redirect, Form, Link, useNavigation } from "react-router";
-import type { Route } from "./+types/_dashboard.assignments.new";
+import { redirect,Form, Link, useNavigation } from "react-router";
+import type { Route } from "./+types/_dashboard.user.assignments.new";
 import { requireRole } from "~/lib/session.server";
 import { getCompanyFilter } from "~/services/company.service.server";
 import { handleError, errorResponse } from "~/lib/errors.server";
 import {
   getAvailableAssets,
-  getActiveUsers,
   validateAssetForAssignment,
-  validateUserForAssignment,
   createAssignment,
 } from "~/services/assignment.service.server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
@@ -23,24 +21,20 @@ export function meta() {
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const user = await requireRole(request, ["OWNER", "ADMIN"]);
+  const user = await requireRole(request, ["USER"]);
   const companyFilter = await getCompanyFilter(user);
 
-  const [availableAssets, users] = await Promise.all([
-    getAvailableAssets(companyFilter),
-    getActiveUsers(companyFilter),
-  ]);
+  const availableAssets = await getAvailableAssets(companyFilter);
 
-  return { availableAssets, users };
+  return { availableAssets, user };
 }
 
 export async function action({ request }: Route.ActionArgs) {
-  const user = await requireRole(request, ["OWNER", "ADMIN"]);
+  const user = await requireRole(request, ["USER"]);
   const companyFilter = await getCompanyFilter(user);
   const formData = await request.formData();
 
   const assetId = formData.get("assetId") as string;
-  const userId = formData.get("userId") as string;
   const notes = formData.get("notes") as string;
   const dueDateStr = formData.get("dueDate") as string;
 
@@ -49,21 +43,14 @@ export async function action({ request }: Route.ActionArgs) {
     return errorResponse("Please select an asset");
   }
 
-  if (!userId) {
-    return errorResponse("Please select a user");
-  }
-
   // Validate asset
   const assetValidation = await validateAssetForAssignment(assetId, companyFilter);
   if (!assetValidation.valid) {
     return errorResponse(assetValidation.error || "Invalid asset");
   }
 
-  // Validate user
-  const userValidation = await validateUserForAssignment(userId, companyFilter);
-  if (!userValidation.valid) {
-    return errorResponse(userValidation.error || "Invalid user");
-  }
+  // Use the current user's ID
+  const userId = user.id;
 
   // Create assignment
   try {
@@ -74,28 +61,28 @@ export async function action({ request }: Route.ActionArgs) {
       dueDate: dueDateStr ? new Date(dueDateStr) : undefined,
     });
 
-    return redirect("/dashboard/assignments");
+    return redirect("/dashboard/my-assets");
   } catch (error) {
     return handleError(error);
   }
 }
 
-export default function NewAssignmentPage({ loaderData, actionData }: Route.ComponentProps) {
-  const { availableAssets, users } = loaderData;
+export default function NewUserAssignmentPage({ loaderData, actionData }: Route.ComponentProps) {
+  const { availableAssets, user } = loaderData;
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Link to="/dashboard/assignments">
+        <Link to="/dashboard/my-assets">
           <Button variant="ghost" size="icon">
             <ArrowLeft className="h-4 w-4" />
           </Button>
         </Link>
         <div>
-          <h1 className="text-3xl font-bold">New Assignment</h1>
-          <p className="text-muted-foreground">Assign an asset to a user</p>
+          <h1 className="text-3xl font-bold">Claim Asset</h1>
+          <p className="text-muted-foreground">Assign an asset to yourself</p>
         </div>
       </div>
 
@@ -103,7 +90,7 @@ export default function NewAssignmentPage({ loaderData, actionData }: Route.Comp
         <CardHeader>
           <CardTitle>Assignment Details</CardTitle>
           <CardDescription>
-            Select an available asset and the user to assign it to
+            Select an available asset to claim
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -121,13 +108,6 @@ export default function NewAssignmentPage({ loaderData, actionData }: Route.Comp
                 No available assets to assign. All assets are currently assigned or in other states.
               </AlertDescription>
             </Alert>
-          ) : users.length === 0 ? (
-            <Alert className="mb-6">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                No active users available. Please ensure there are active users in the system.
-              </AlertDescription>
-            </Alert>
           ) : (
             <Form method="post" className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -143,16 +123,12 @@ export default function NewAssignmentPage({ loaderData, actionData }: Route.Comp
                   }))}
                 />
 
-                <FormSelect
-                  label="Assign To"
-                  name="userId"
-                  required
-                  placeholder="Select a user"
-                  options={users.map((user) => ({
-                    label: `${user.firstName} ${user.lastName} (${user.email})`,
-                    value: user.id,
-                  }))}
-                />
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">Assign To</div>
+                  <div className="p-3 bg-muted rounded-md text-sm font-medium">
+                    {user.firstName} {user.lastName} (Me)
+                  </div>
+                </div>
 
                 <FormField
                   label="Due Date (Optional)"
@@ -161,7 +137,6 @@ export default function NewAssignmentPage({ loaderData, actionData }: Route.Comp
                   helperText="Optional expected return date"
                 />
               </div>
-
               <FormTextarea
                 label="Notes (Optional)"
                 name="notes"
@@ -172,9 +147,9 @@ export default function NewAssignmentPage({ loaderData, actionData }: Route.Comp
               <div className="flex gap-4">
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Create Assignment
+                  Claim Asset
                 </Button>
-                <Link to="/dashboard/assignments">
+                <Link to="/dashboard/my-assets">
                   <Button type="button" variant="outline">
                     Cancel
                   </Button>

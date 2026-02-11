@@ -216,6 +216,37 @@ export async function updateUser(
   return { user: updatedUser };
 }
 
+// delete users
+
+export async function deleteUser(userId: string, currentUser: { id: string; role: string; companyId: string | null }) {
+  const companyFilter = await getCompanyFilter(currentUser);
+
+  // Verify access
+  const user = await prisma.user.findFirst({
+    where: { id: userId, ...companyFilter },
+  });
+
+  if (!user) {
+    return { error: "User not found or unauthorized" };
+  }
+
+  // Cannot delete yourself
+  if (userId === currentUser.id) {
+    return { error: "Cannot delete your own account" };
+  }
+
+  // Cannot delete an OWNER (only another OWNER can)
+  if (user.role === "OWNER" && currentUser.role !== "OWNER") {
+    return { error: "Only owners can delete owner accounts" };
+  }
+
+  await prisma.user.delete({
+    where: { id: userId },
+  });
+
+  return { success: true };
+}
+
 /**
  * Toggle user active status
  */

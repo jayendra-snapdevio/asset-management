@@ -46,7 +46,7 @@ export function CategoryBarChart({ data }: CategoryBarChartProps) {
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={chartData} layout="vertical">
             <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
-            <XAxis type="number" />
+            <XAxis type="number"  allowDecimals={false}/>
             <YAxis
               dataKey="category"
               type="category"

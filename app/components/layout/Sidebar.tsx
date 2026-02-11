@@ -38,7 +38,7 @@ const navItems: NavItem[] = [
     label: "Assets",
     href: "/dashboard/assets",
     icon: <Package className="h-5 w-5" />,
-    roles: ["OWNER", "ADMIN"],
+    roles: ["OWNER", "ADMIN", "USER"],
   },
   {
     label: "Users",
@@ -56,7 +56,7 @@ const navItems: NavItem[] = [
     label: "Assignments",
     href: "/dashboard/assignments",
     icon: <ClipboardList className="h-5 w-5" />,
-    roles: ["OWNER", "ADMIN"],
+    roles: ["OWNER", "ADMIN", "USER"],
   },
   {
     label: "My Assets",
@@ -67,7 +67,7 @@ const navItems: NavItem[] = [
     label: "Settings",
     href: "/dashboard/settings",
     icon: <Settings className="h-5 w-5" />,
-    roles: ["OWNER", "ADMIN"],
+    roles: ["OWNER", "ADMIN", "USER"],
   },
   {
     label: "Profile",
@@ -76,20 +76,59 @@ const navItems: NavItem[] = [
   },
 ];
 
-export function Sidebar({ user }: SidebarProps) {
+export function SidebarContent({ 
+  user, 
+  collapsed = false, 
+  onNavItemClick 
+}: { 
+  user: User; 
+  collapsed?: boolean;
+  onNavItemClick?: () => void;
+}) {
   const location = useLocation();
-  const [collapsed, setCollapsed] = useState(false);
-
-  // Filter nav items based on user role
   const filteredNavItems = navItems.filter((item) => {
     if (!item.roles) return true;
-    return item.roles.includes(user.role);
+    return item.roles.includes(user.role as any);
   });
+
+  return (
+    <nav className="space-y-1 px-2">
+      {filteredNavItems.map((item) => {
+        const isActive =
+          location.pathname === item.href ||
+          (item.href !== "/dashboard" &&
+            location.pathname.startsWith(item.href));
+
+        return (
+          <Link
+            key={item.href}
+            to={item.href}
+            onClick={onNavItemClick}
+            className={cn(
+              "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+              isActive
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground",
+              collapsed && "justify-center"
+            )}
+            title={collapsed ? item.label : undefined}
+          >
+            {item.icon}
+            {!collapsed && <span>{item.label}</span>}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
+export function Sidebar({ user }: SidebarProps) {
+  const [collapsed, setCollapsed] = useState(false);
 
   return (
     <aside
       className={cn(
-        "flex flex-col border-r bg-card transition-all duration-300",
+        "hidden md:flex flex-col border-r bg-card transition-all duration-300",
         collapsed ? "w-16" : "w-64"
       )}
     >
@@ -110,32 +149,7 @@ export function Sidebar({ user }: SidebarProps) {
 
       {/* Navigation */}
       <ScrollArea className="flex-1 py-4">
-        <nav className="space-y-1 px-2">
-          {filteredNavItems.map((item) => {
-            const isActive =
-              location.pathname === item.href ||
-              (item.href !== "/dashboard" &&
-                location.pathname.startsWith(item.href));
-
-            return (
-              <Link
-                key={item.href}
-                to={item.href}
-                className={cn(
-                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                  isActive
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                  collapsed && "justify-center"
-                )}
-                title={collapsed ? item.label : undefined}
-              >
-                {item.icon}
-                {!collapsed && <span>{item.label}</span>}
-              </Link>
-            );
-          })}
-        </nav>
+        <SidebarContent user={user} collapsed={collapsed} />
       </ScrollArea>
 
       {/* Collapse button */}
