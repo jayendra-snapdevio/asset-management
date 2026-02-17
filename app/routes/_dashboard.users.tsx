@@ -328,7 +328,7 @@ export default function UsersPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold">Users</h1>
           <p className="text-muted-foreground">
@@ -336,12 +336,14 @@ export default function UsersPage({
           </p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Add User
-            </Button>
-          </DialogTrigger>
+          <div className="flex items-center gap-4">
+            <DialogTrigger asChild>
+              <Button className="w-full md:w-[180px]">
+                <Plus className="h-4 w-4 mr-2" />
+                Add User
+              </Button>
+            </DialogTrigger>
+          </div>
           <DialogContent className="sm:max-w-[500px]">
             <Form method="post" onSubmit={() => setIsDialogOpen(true)}>
               <DialogHeader>
@@ -457,8 +459,8 @@ export default function UsersPage({
               value={roleFilter || "all"}
               onValueChange={(value) => handleFilterChange("role", value)}
             >
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Role"  />
+              <SelectTrigger className="w-full md:w-[140px]">
+                <SelectValue placeholder="Role" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Roles</SelectItem>
@@ -471,7 +473,7 @@ export default function UsersPage({
               value={isActiveFilter || "all"}
               onValueChange={(value) => handleFilterChange("isActive", value)}
             >
-              <SelectTrigger className="w-[140px]">
+              <SelectTrigger className="w-full md:w-[140px]">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
@@ -481,7 +483,7 @@ export default function UsersPage({
               </SelectContent>
             </Select>
             {hasFilters && (
-              <Button variant="ghost" onClick={clearFilters}>
+              <Button variant="ghost" onClick={clearFilters} className="w-full md:w-[140px]">
                 Clear filters
               </Button>
             )}
@@ -559,7 +561,7 @@ export default function UsersPage({
                             <Edit2 className="h-3 w-3" />
                           </Link>
                         </Button>
-                        
+
                         {currentUser.id !== user.id && (
                           <Dialog>
                             <DialogTrigger asChild>

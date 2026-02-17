@@ -14,8 +14,63 @@ async function main() {
 
   console.log("🗑️  Cleared existing data");
 
-  // Hash password for all users
-  const hashedPassword = await bcrypt.hash("password123", 10);
+  // Helper function to create asset with assignment
+  async function createAssetWithAssignment({
+    userEmail,
+    name,
+    serial,
+    manufacturer,
+    category,
+    ownershipTag,
+    description = "",
+    model = "",
+  }: {
+    userEmail: string;
+    name: string;
+    serial: string;
+    manufacturer: string;
+    category: string;
+    ownershipTag: "Asset Company" | "Asset Private";
+    description?: string;
+    model?: string;
+  }) {
+    const user = snapdevioUsers[userEmail];
+    if (!user) {
+      console.warn(`User ${userEmail} not found, skipping asset ${name}`);
+      return;
+    }
+
+    const ownershipType = ownershipTag === "Asset Private" ? "PRIVATE" : "COMPANY";
+    const ownerId = ownershipTag === "Asset Private" ? user.id : null;
+
+    const asset = await prisma.asset.create({
+      data: {
+        name,
+        description,
+        serialNumber: serial,
+        model,
+        manufacturer,
+        status: AssetStatus.ASSIGNED,
+        category,
+        ownershipType,
+        tags: [ownershipTag],
+        companyId: snapdevio.id,
+        createdById: snapdevioOwner.id,
+        ownerId,
+      },
+    });
+
+    await prisma.assignment.create({
+      data: {
+        assetId: asset.id,
+        userId: user.id,
+        assignedDate: new Date(),
+        dueDate: new Date("2026-02-13"),
+        status: AssignmentStatus.ACTIVE,
+        notes: `Initial assignment - ${ownershipTag}`,
+      },
+    });
+  }
 
   // ============================================
   // COMPANY 1: SNAPDEVIO
@@ -36,6 +91,8 @@ async function main() {
   // Snapdevio users data
   const snapdevioUsersData = [
     { email: "owner@snapdevio.com", firstName: "Owner", lastName: "Snapdevio", role: Role.OWNER },
+    { email: "rohit.bhadani@snapdevio.com", firstName: "Rohit", lastName: "Bhadani", role: Role.ADMIN },
+    { email: "alpesh.gevariya@snapdevio.com", firstName: "Alpesh", lastName: "Gevariya", role: Role.ADMIN },
     { email: "admin@snapdevio.com", firstName: "Admin", lastName: "Snapdevio", role: Role.ADMIN },
     { email: "jayendra.ramani@snapdevio.com", firstName: "Jayendra", lastName: "Ramani", role: Role.USER },
     { email: "chintandhokai97@gmail.com", firstName: "Chintan", lastName: "Dhokai", role: Role.USER },
@@ -70,17 +127,25 @@ async function main() {
     { email: "shivang.dave@snapdevio.com", firstName: "Shivang", lastName: "Dave", role: Role.USER },
     { email: "rakesh.gosalia@snapdevio.com", firstName: "Rakesh", lastName: "Gosalia", role: Role.USER },
     { email: "dhruvi.italiya@snapdevio.com", firstName: "Dhruvi", lastName: "Italiya", role: Role.USER },
-  ];
+  ]
 
-  // Create all Snapdevio users
-  await prisma.user.createMany({
-    data: snapdevioUsersData.map((user) => ({
-      ...user,
-      password: hashedPassword,
-      isActive: true,
-      companyId: snapdevio.id,
-    })),
-  });
+;
+
+  // Create Snapdevio users with individual passwords (firstname@snapdevio406)
+  for (const userData of snapdevioUsersData) {
+    const password = userData.role === Role.OWNER || userData.role === Role.ADMIN
+      ? await bcrypt.hash("password123", 10) // Keep simple password for owner/admin
+      : await bcrypt.hash(`${userData.firstName.toLowerCase()}@snapdevio406`, 10);
+    
+    await prisma.user.create({
+      data: {
+        ...userData,
+        password,
+        isActive: true,
+        companyId: snapdevio.id,
+      },
+    });
+  }
 
   // Fetch created users for references
   const snapdevioUsersList = await prisma.user.findMany({
@@ -103,61 +168,182 @@ async function main() {
     data: { ownerId: snapdevioOwner.id },
   });
 
-  // Snapdevio assets data
-  const snapdevioAssetsData = [
-    { name: "MacBook Pro 16-inch", description: "Apple MacBook Pro with M3 Max chip, 64GB RAM, 1TB SSD", serialNumber: "SD-LP-001", model: "MacBook Pro 16 (2024)", manufacturer: "Apple", purchaseDate: new Date("2024-01-15"), purchasePrice: 3499.00, currentValue: 3200.00, location: "Snapdevio Office, Floor 4", status: AssetStatus.ASSIGNED, category: "Laptops", tags: ["apple", "development", "high-performance"], createdById: snapdevioOwner.id },
-    { name: "Dell XPS 15", description: "Dell XPS 15 with Intel i9, 32GB RAM, 512GB SSD", serialNumber: "SD-LP-002", model: "XPS 15 9530", manufacturer: "Dell", purchaseDate: new Date("2024-02-20"), purchasePrice: 2199.00, currentValue: 1900.00, location: "Snapdevio Office, Floor 4", status: AssetStatus.ASSIGNED, category: "Laptops", tags: ["dell", "windows", "development"], createdById: snapdevioOwner.id },
-    { name: "ThinkPad X1 Carbon", description: "Lenovo ThinkPad X1 Carbon Gen 11, Intel i7, 16GB RAM", serialNumber: "SD-LP-003", model: "X1 Carbon Gen 11", manufacturer: "Lenovo", purchaseDate: new Date("2024-03-10"), purchasePrice: 1899.00, currentValue: 1700.00, location: "Snapdevio Office, Floor 4", status: AssetStatus.AVAILABLE, category: "Laptops", tags: ["lenovo", "business", "ultrabook"], createdById: snapdevioAdmin.id },
-    { name: "LG UltraWide 34-inch", description: "LG 34WN80C-B 34-inch Curved UltraWide Monitor", serialNumber: "SD-MN-001", model: "34WN80C-B", manufacturer: "LG", purchaseDate: new Date("2024-01-20"), purchasePrice: 699.00, currentValue: 600.00, location: "Snapdevio Office, Floor 4", status: AssetStatus.ASSIGNED, category: "Monitors", tags: ["lg", "ultrawide", "curved"], createdById: snapdevioOwner.id },
-    { name: "Dell UltraSharp 27-inch 4K", description: "Dell UltraSharp U2723QE 27-inch 4K USB-C Hub Monitor", serialNumber: "SD-MN-002", model: "U2723QE", manufacturer: "Dell", purchaseDate: new Date("2024-02-25"), purchasePrice: 799.00, currentValue: 720.00, location: "Snapdevio Office, Floor 4", status: AssetStatus.AVAILABLE, category: "Monitors", tags: ["dell", "4k", "usb-c"], createdById: snapdevioAdmin.id },
-    { name: "Logitech MX Keys", description: "Logitech MX Keys Advanced Wireless Illuminated Keyboard", serialNumber: "SD-KB-001", model: "MX Keys", manufacturer: "Logitech", purchaseDate: new Date("2024-01-25"), purchasePrice: 119.00, currentValue: 100.00, location: "Snapdevio Office, Floor 4", status: AssetStatus.ASSIGNED, category: "Peripherals", tags: ["logitech", "wireless", "keyboard"], createdById: snapdevioOwner.id },
-    { name: "Logitech MX Master 3S", description: "Logitech MX Master 3S Wireless Performance Mouse", serialNumber: "SD-MS-001", model: "MX Master 3S", manufacturer: "Logitech", purchaseDate: new Date("2024-01-25"), purchasePrice: 99.00, currentValue: 85.00, location: "Snapdevio Office, Floor 4", status: AssetStatus.ASSIGNED, category: "Peripherals", tags: ["logitech", "wireless", "mouse"], createdById: snapdevioOwner.id },
-    { name: "iPhone 15 Pro", description: "Apple iPhone 15 Pro, 256GB, Blue Titanium", serialNumber: "SD-PH-001", model: "iPhone 15 Pro", manufacturer: "Apple", purchaseDate: new Date("2024-04-01"), purchasePrice: 999.00, currentValue: 900.00, location: "Snapdevio Office, Floor 4", status: AssetStatus.ASSIGNED, category: "Mobile Devices", tags: ["apple", "smartphone", "5g"], createdById: snapdevioOwner.id },
-    { name: "Epson PowerLite", description: "Epson PowerLite 1795F Wireless Full HD Projector", serialNumber: "SD-PJ-001", model: "PowerLite 1795F", manufacturer: "Epson", purchaseDate: new Date("2023-09-10"), purchasePrice: 899.00, currentValue: 700.00, location: "Conference Room", status: AssetStatus.UNDER_MAINTENANCE, category: "AV Equipment", tags: ["epson", "projector", "wireless"], createdById: snapdevioAdmin.id },
-  ];
+  // ============================================
+  // SNAPDEVIO ASSETS & ASSIGNMENTS
+  // ============================================
+  console.log("Creating Snapdevio assets and assignments...");
 
-  // Create all Snapdevio assets
-  await prisma.asset.createMany({
-    data: snapdevioAssetsData.map((asset) => ({
-      ...asset,
-      companyId: snapdevio.id,
-    })),
-  });
+  // Chintan Dhokai
+  await createAssetWithAssignment({ userEmail: "chintandhokai97@gmail.com", name: "Dell Laptop", serial: "SD-CH-001", model:"Dell Latitude 5420", manufacturer: "Dell", category: "Laptop", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "chintandhokai97@gmail.com", name: "Charger", serial: "SD-CH-002", manufacturer: "Dell", category: "Accessory", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "chintandhokai97@gmail.com", name: "Mouse", serial: "SD-CH-003", manufacturer: "Logitech", category: "Accessory", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "chintandhokai97@gmail.com", name: "Mouse Pad", serial: "SD-CH-004", manufacturer: "Generic", category: "Accessory", ownershipTag: "Asset Company" });
 
-  // Fetch created assets for references
-  const snapdevioAssetsList = await prisma.asset.findMany({
-    where: { companyId: snapdevio.id },
-  });
-  const snapdevioAssets = Object.fromEntries(
-    snapdevioAssetsList.map((a) => [a.serialNumber, a])
-  );
+  // Devang Patel
+  await createAssetWithAssignment({ userEmail: "devang.patel@snapdevio.com", name: "MacBook", serial: "SD-DP-001", manufacturer: "Apple", category: "Laptop", ownershipTag: "Asset Private" });
+  await createAssetWithAssignment({ userEmail: "devang.patel@snapdevio.com", name: "Mouse", serial: "SD-DP-002", manufacturer: "Logitech", category: "Accessory", ownershipTag: "Asset Private" });
+  await createAssetWithAssignment({ userEmail: "devang.patel@snapdevio.com", name: "Charger", serial: "SD-DP-003", manufacturer: "Apple", category: "Accessory", ownershipTag: "Asset Private" });
+  await createAssetWithAssignment({ userEmail: "devang.patel@snapdevio.com", name: "Mouse Pad", serial: "SD-DP-004", manufacturer: "Generic", category: "Accessory", ownershipTag: "Asset Private" });
+  await createAssetWithAssignment({ userEmail: "devang.patel@snapdevio.com", name: "Laptop Stand", serial: "SD-DP-005", manufacturer: "Generic", category: "Accessory", ownershipTag: "Asset Private" });
 
-  // Snapdevio assignments data
-  const snapdevioAssignmentsData: Array<{
-    assetSerial: string;
-    userEmail: string;
-    assignedDate: Date;
-    dueDate?: Date;
-    returnDate?: Date;
-    notes: string;
-    status: AssignmentStatus;
-  }> = [
-    { assetSerial: "SD-LP-001", userEmail: "jayendra.ramani@snapdevio.com", assignedDate: new Date("2024-01-20"), dueDate: new Date("2025-01-20"), notes: "Assigned for software development work", status: AssignmentStatus.ACTIVE },
-    { assetSerial: "SD-LP-002", userEmail: "chintandhokai97@gmail.com", assignedDate: new Date("2024-02-25"), dueDate: new Date("2025-02-25"), notes: "Assigned for frontend development", status: AssignmentStatus.ACTIVE },
-    { assetSerial: "SD-MN-001", userEmail: "jayendra.ramani@snapdevio.com", assignedDate: new Date("2024-01-20"), notes: "Companion monitor for MacBook Pro", status: AssignmentStatus.ACTIVE },
-    { assetSerial: "SD-KB-001", userEmail: "jayendra.ramani@snapdevio.com", assignedDate: new Date("2024-01-25"), notes: "Ergonomic keyboard for daily use", status: AssignmentStatus.ACTIVE },
-    { assetSerial: "SD-MS-001", userEmail: "jayendra.ramani@snapdevio.com", assignedDate: new Date("2024-01-25"), notes: "Wireless mouse for productivity", status: AssignmentStatus.ACTIVE },
-    { assetSerial: "SD-PH-001", userEmail: "devang.patel@snapdevio.com", assignedDate: new Date("2024-04-05"), dueDate: new Date("2025-04-05"), notes: "Company phone for client communication", status: AssignmentStatus.ACTIVE },
-  ];
+  // Bhavesh Patel
+  await createAssetWithAssignment({ userEmail: "bhavesh.patel@snapdevio.com", name: "Desktop", serial: "SD-BP-001", manufacturer: "HP", category: "Desktop", ownershipTag: "Asset Private" });
+  await createAssetWithAssignment({ userEmail: "bhavesh.patel@snapdevio.com", name: "Keyboard", serial: "SD-BP-002", manufacturer: "Logitech", category: "Accessory", ownershipTag: "Asset Private" });
+  await createAssetWithAssignment({ userEmail: "bhavesh.patel@snapdevio.com", name: "Mouse", serial: "SD-BP-003", manufacturer: "Logitech", category: "Accessory", ownershipTag: "Asset Private" });
+  await createAssetWithAssignment({ userEmail: "bhavesh.patel@snapdevio.com", name: "Mouse Pad", serial: "SD-BP-004", manufacturer: "Generic", category: "Accessory", ownershipTag: "Asset Private" });
+  await createAssetWithAssignment({ userEmail: "bhavesh.patel@snapdevio.com", name: "CPU", serial: "SD-BP-005", manufacturer: "Intel", category: "Component", ownershipTag: "Asset Private" });
 
-  // Create all Snapdevio assignments
-  await prisma.assignment.createMany({
-    data: snapdevioAssignmentsData.map(({ assetSerial, userEmail, ...rest }) => ({
-      ...rest,
-      assetId: snapdevioAssets[assetSerial].id,
-      userId: snapdevioUsers[userEmail].id,
-    })),
-  });
+  // Abhay Gaudani
+  await createAssetWithAssignment({ userEmail: "abhay.gaudani@snapdevio.com", name: "Asus Laptop", serial: "SD-AG-001", manufacturer: "Asus", category: "Laptop", ownershipTag: "Asset Private" });
+  await createAssetWithAssignment({ userEmail: "abhay.gaudani@snapdevio.com", name: "Mouse", serial: "SD-AG-002", manufacturer: "Logitech", category: "Accessory", ownershipTag: "Asset Private" });
+  await createAssetWithAssignment({ userEmail: "abhay.gaudani@snapdevio.com", name: "Charger", serial: "SD-AG-003", manufacturer: "Asus", category: "Accessory", ownershipTag: "Asset Private" });
+  await createAssetWithAssignment({ userEmail: "abhay.gaudani@snapdevio.com", name: "Mouse Pad", serial: "SD-AG-004", manufacturer: "Generic", category: "Accessory", ownershipTag: "Asset Private" });
+  await createAssetWithAssignment({ userEmail: "abhay.gaudani@snapdevio.com", name: "Keyboard", serial: "SD-AG-005", manufacturer: "Logitech", category: "Accessory", ownershipTag: "Asset Private" });
+
+  // Devarshi Savaliya
+  await createAssetWithAssignment({ userEmail: "devarshi.savaliya@snapdevio.com", name: "Desktop", serial: "SD-DS-001", manufacturer: "HP", category: "Desktop", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "devarshi.savaliya@snapdevio.com", name: "Keyboard", serial: "SD-DS-002", manufacturer: "Logitech", category: "Accessory", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "devarshi.savaliya@snapdevio.com", name: "Mouse", serial: "SD-DS-003", manufacturer: "Logitech", category: "Accessory", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "devarshi.savaliya@snapdevio.com", name: "Mouse Pad", serial: "SD-DS-004", manufacturer: "Generic", category: "Accessory", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "devarshi.savaliya@snapdevio.com", name: "CPU", serial: "SD-DS-005", manufacturer: "Intel", category: "Component", ownershipTag: "Asset Company" });
+
+  // Paras Devaliya
+  await createAssetWithAssignment({ userEmail: "paras.devaliya@snapdevio.com", name: "Dell Laptop", serial: "SD-PD-001", manufacturer: "Dell", category: "Laptop", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "paras.devaliya@snapdevio.com", name: "Mouse", serial: "SD-PD-002", manufacturer: "Logitech", category: "Accessory", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "paras.devaliya@snapdevio.com", name: "Charger", serial: "SD-PD-003", manufacturer: "Dell", category: "Accessory", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "paras.devaliya@snapdevio.com", name: "Mouse Pad", serial: "SD-PD-004", manufacturer: "Generic", category: "Accessory", ownershipTag: "Asset Company" });
+
+  // Dhvanil Soladhra
+  await createAssetWithAssignment({ userEmail: "dhvanil.soladhra@snapdevio.com", name: "Lenovo Laptop", serial: "SD-DHS-001", manufacturer: "Lenovo", category: "Laptop", ownershipTag: "Asset Private" });
+  await createAssetWithAssignment({ userEmail: "dhvanil.soladhra@snapdevio.com", name: "Mouse", serial: "SD-DHS-002", manufacturer: "Logitech", category: "Accessory", ownershipTag: "Asset Private" });
+  await createAssetWithAssignment({ userEmail: "dhvanil.soladhra@snapdevio.com", name: "Charger", serial: "SD-DHS-003", manufacturer: "Lenovo", category: "Accessory", ownershipTag: "Asset Private" });
+  await createAssetWithAssignment({ userEmail: "dhvanil.soladhra@snapdevio.com", name: "Mouse Pad", serial: "SD-DHS-004", manufacturer: "Generic", category: "Accessory", ownershipTag: "Asset Private" });
+  await createAssetWithAssignment({ userEmail: "dhvanil.soladhra@snapdevio.com", name: "Laptop Stand", serial: "SD-DHS-005", manufacturer: "Generic", category: "Accessory", ownershipTag: "Asset Private" });
+
+  // Meet Sheladiya
+  await createAssetWithAssignment({ userEmail: "training+meet@snapdevio.com", name: "Dell Laptop", serial: "SD-MS-001", manufacturer: "Dell", category: "Laptop", ownershipTag: "Asset Private" });
+  await createAssetWithAssignment({ userEmail: "training+meet@snapdevio.com", name: "Laptop Stand", serial: "SD-MS-002", manufacturer: "Generic", category: "Accessory", ownershipTag: "Asset Private" });
+  await createAssetWithAssignment({ userEmail: "training+meet@snapdevio.com", name: "Mouse", serial: "SD-MS-003", manufacturer: "Logitech", category: "Accessory", ownershipTag: "Asset Private" });
+  await createAssetWithAssignment({ userEmail: "training+meet@snapdevio.com", name: "Charger", serial: "SD-MS-004", manufacturer: "Dell", category: "Accessory", ownershipTag: "Asset Private" });
+  await createAssetWithAssignment({ userEmail: "training+meet@snapdevio.com", name: "Mouse Pad", serial: "SD-MS-005", manufacturer: "Generic", category: "Accessory", ownershipTag: "Asset Private" });
+  await createAssetWithAssignment({ userEmail: "training+meet@snapdevio.com", name: "Keyboard", serial: "SD-MS-006", manufacturer: "Logitech", category: "Accessory", ownershipTag: "Asset Private" });
+
+  // Krina Kumbhani
+  await createAssetWithAssignment({ userEmail: "krina.kumbhani@snapdevio.com", name: "Dell Laptop", serial: "SD-KK-001", manufacturer: "Dell", category: "Laptop", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "krina.kumbhani@snapdevio.com", name: "Mouse", serial: "SD-KK-002", manufacturer: "Logitech", category: "Accessory", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "krina.kumbhani@snapdevio.com", name: "Charger", serial: "SD-KK-003", manufacturer: "Dell", category: "Accessory", ownershipTag: "Asset Company" });
+
+  // Raj Dhokai
+  await createAssetWithAssignment({ userEmail: "raj.dhokai@snapdevio.com", name: "HP Laptop", serial: "SD-RD-001", manufacturer: "HP", category: "Laptop", ownershipTag: "Asset Private" });
+  await createAssetWithAssignment({ userEmail: "raj.dhokai@snapdevio.com", name: "Mouse", serial: "SD-RD-002", manufacturer: "Logitech", category: "Accessory", ownershipTag: "Asset Private" });
+  await createAssetWithAssignment({ userEmail: "raj.dhokai@snapdevio.com", name: "Mouse Pad", serial: "SD-RD-003", manufacturer: "Generic", category: "Accessory", ownershipTag: "Asset Private" });
+  await createAssetWithAssignment({ userEmail: "raj.dhokai@snapdevio.com", name: "Charger", serial: "SD-RD-004", manufacturer: "HP", category: "Accessory", ownershipTag: "Asset Private" });
+
+  // Diya Ghelani
+  await createAssetWithAssignment({ userEmail: "diya.ghelani@snapdevio.com", name: "Desktop", serial: "SD-DG-001", manufacturer: "HP", category: "Desktop", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "diya.ghelani@snapdevio.com", name: "Keyboard", serial: "SD-DG-002", manufacturer: "Logitech", category: "Accessory", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "diya.ghelani@snapdevio.com", name: "Mouse Pad", serial: "SD-DG-003", manufacturer: "Generic", category: "Accessory", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "diya.ghelani@snapdevio.com", name: "Mouse", serial: "SD-DG-004", manufacturer: "Logitech", category: "Accessory", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "diya.ghelani@snapdevio.com", name: "CPU", serial: "SD-DG-005", manufacturer: "Intel", category: "Component", ownershipTag: "Asset Company" });
+
+  // Divyang Bhadani
+  await createAssetWithAssignment({ userEmail: "divyang.bhadani@snapdevio.com", name: "Asus Laptop", serial: "SD-DB-001", manufacturer: "Asus", category: "Laptop", ownershipTag: "Asset Private" });
+  await createAssetWithAssignment({ userEmail: "divyang.bhadani@snapdevio.com", name: "Mouse", serial: "SD-DB-002", manufacturer: "Logitech", category: "Accessory", ownershipTag: "Asset Private" });
+  await createAssetWithAssignment({ userEmail: "divyang.bhadani@snapdevio.com", name: "Mouse Pad", serial: "SD-DB-003", manufacturer: "Generic", category: "Accessory", ownershipTag: "Asset Private" });
+  await createAssetWithAssignment({ userEmail: "divyang.bhadani@snapdevio.com", name: "Charger", serial: "SD-DB-004", manufacturer: "Asus", category: "Accessory", ownershipTag: "Asset Private" });
+
+  // Dhruti Hirapara
+  await createAssetWithAssignment({ userEmail: "dhruti.hirapara@snapdevio.com", name: "Desktop", serial: "SD-DHI-001", manufacturer: "HP", category: "Desktop", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "dhruti.hirapara@snapdevio.com", name: "Keyboard", serial: "SD-DHI-002", manufacturer: "Logitech", category: "Accessory", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "dhruti.hirapara@snapdevio.com", name: "Mouse", serial: "SD-DHI-003", manufacturer: "Logitech", category: "Accessory", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "dhruti.hirapara@snapdevio.com", name: "Mouse Pad", serial: "SD-DHI-004", manufacturer: "Generic", category: "Accessory", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "dhruti.hirapara@snapdevio.com", name: "CPU", serial: "SD-DHI-005", manufacturer: "Intel", category: "Component", ownershipTag: "Asset Company" });
+
+  // Dilip Jasoliya
+  await createAssetWithAssignment({ userEmail: "dilip.jasoliya@snapdevio.com", name: "Desktop", serial: "SD-DJ-001", manufacturer: "HP", category: "Desktop", ownershipTag: "Asset Private" });
+  await createAssetWithAssignment({ userEmail: "dilip.jasoliya@snapdevio.com", name: "Keyboard", serial: "SD-DJ-002", manufacturer: "Logitech", category: "Accessory", ownershipTag: "Asset Private" });
+  await createAssetWithAssignment({ userEmail: "dilip.jasoliya@snapdevio.com", name: "Mouse", serial: "SD-DJ-003", manufacturer: "Logitech", category: "Accessory", ownershipTag: "Asset Private" });
+  await createAssetWithAssignment({ userEmail: "dilip.jasoliya@snapdevio.com", name: "Mouse Pad", serial: "SD-DJ-004", manufacturer: "Generic", category: "Accessory", ownershipTag: "Asset Private" });
+  await createAssetWithAssignment({ userEmail: "dilip.jasoliya@snapdevio.com", name: "CPU", serial: "SD-DJ-005", manufacturer: "Intel", category: "Component", ownershipTag: "Asset Private" });
+
+  // Dhruvi Tagadiya
+  await createAssetWithAssignment({ userEmail: "dhruvi.tagadiya@snapdevio.com", name: "Dell Laptop", serial: "SD-DT-001", manufacturer: "Dell", category: "Laptop", ownershipTag: "Asset Private" });
+  await createAssetWithAssignment({ userEmail: "dhruvi.tagadiya@snapdevio.com", name: "Charger", serial: "SD-DT-002", manufacturer: "Dell", category: "Accessory", ownershipTag: "Asset Private" });
+  await createAssetWithAssignment({ userEmail: "dhruvi.tagadiya@snapdevio.com", name: "Mouse", serial: "SD-DT-003", manufacturer: "Logitech", category: "Accessory", ownershipTag: "Asset Private" });
+  await createAssetWithAssignment({ userEmail: "dhruvi.tagadiya@snapdevio.com", name: "Mouse Pad", serial: "SD-DT-004", manufacturer: "Generic", category: "Accessory", ownershipTag: "Asset Private" });
+
+  // Nishank Radadiya
+  await createAssetWithAssignment({ userEmail: "nishank.radadiya@snapdevio.com", name: "Acer Predator Laptop", serial: "SD-NR-001", manufacturer: "Acer", category: "Laptop", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "nishank.radadiya@snapdevio.com", name: "Charger", serial: "SD-NR-002", manufacturer: "Acer", category: "Accessory", ownershipTag: "Asset Company" });
+
+  // Vanshita Nakrani
+  await createAssetWithAssignment({ userEmail: "training+vanshita@snapdevio.com", name: "Dell Laptop", serial: "SD-VN-001", manufacturer: "Dell", category: "Laptop", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "training+vanshita@snapdevio.com", name: "Charger", serial: "SD-VN-002", manufacturer: "Dell", category: "Accessory", ownershipTag: "Asset Company" });
+
+  // Meghna Tandel
+  await createAssetWithAssignment({ userEmail: "meghna.tandel@snapdevio.com", name: "HP Laptop", serial: "SD-MT-001", manufacturer: "HP", category: "Laptop", ownershipTag: "Asset Private" });
+  await createAssetWithAssignment({ userEmail: "meghna.tandel@snapdevio.com", name: "Charger", serial: "SD-MT-002", manufacturer: "HP", category: "Accessory", ownershipTag: "Asset Private" });
+
+  // Fensi Kotadiya
+  await createAssetWithAssignment({ userEmail: "fensi.kotadiya@snapdevio.com", name: "Dell Laptop", serial: "SD-FK-001", manufacturer: "Dell", category: "Laptop", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "fensi.kotadiya@snapdevio.com", name: "Mouse", serial: "SD-FK-002", manufacturer: "Logitech", category: "Accessory", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "fensi.kotadiya@snapdevio.com", name: "Charger", serial: "SD-FK-003", manufacturer: "Dell", category: "Accessory", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "fensi.kotadiya@snapdevio.com", name: "Mouse Pad", serial: "SD-FK-004", manufacturer: "Generic", category: "Accessory", ownershipTag: "Asset Company" });
+
+  // Krutika Lakhani
+  await createAssetWithAssignment({ userEmail: "krutika.lakhani@snapdevio.com", name: "Dell Laptop", serial: "SD-KL-001", manufacturer: "Dell", category: "Laptop", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "krutika.lakhani@snapdevio.com", name: "Mouse", serial: "SD-KL-002", manufacturer: "Logitech", category: "Accessory", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "krutika.lakhani@snapdevio.com", name: "Charger", serial: "SD-KL-003", manufacturer: "Dell", category: "Accessory", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "krutika.lakhani@snapdevio.com", name: "Mouse Pad", serial: "SD-KL-004", manufacturer: "Generic", category: "Accessory", ownershipTag: "Asset Company" });
+
+  // Khushbu Pambhar
+  await createAssetWithAssignment({ userEmail: "khushbu.pambhar@snapdevio.com", name: "Dell Laptop", serial: "SD-KP-001", manufacturer: "Dell", category: "Laptop", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "khushbu.pambhar@snapdevio.com", name: "Mouse", serial: "SD-KP-002", manufacturer: "Logitech", category: "Accessory", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "khushbu.pambhar@snapdevio.com", name: "Charger", serial: "SD-KP-003", manufacturer: "Dell", category: "Accessory", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "khushbu.pambhar@snapdevio.com", name: "Mouse Pad", serial: "SD-KP-004", manufacturer: "Generic", category: "Accessory", ownershipTag: "Asset Company" });
+
+  // Kaushik Gaudani
+  await createAssetWithAssignment({ userEmail: "kaushik.gaudani@snapdevio.com", name: "Dell Laptop", serial: "SD-KG-001", manufacturer: "Dell", category: "Laptop", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "kaushik.gaudani@snapdevio.com", name: "Laptop Stand", serial: "SD-KG-002", manufacturer: "Generic", category: "Accessory", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "kaushik.gaudani@snapdevio.com", name: "Mouse", serial: "SD-KG-003", manufacturer: "Logitech", category: "Accessory", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "kaushik.gaudani@snapdevio.com", name: "Charger", serial: "SD-KG-004", manufacturer: "Dell", category: "Accessory", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "kaushik.gaudani@snapdevio.com", name: "Mouse Pad", serial: "SD-KG-005", manufacturer: "Generic", category: "Accessory", ownershipTag: "Asset Company" });
+
+  // Priyanka Dudhat
+  await createAssetWithAssignment({ userEmail: "priyanka.dudhat@snapdevio.com", name: "Dell Laptop", serial: "SD-PRD-001", manufacturer: "Dell", category: "Laptop", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "priyanka.dudhat@snapdevio.com", name: "Mouse", serial: "SD-PRD-002", manufacturer: "Logitech", category: "Accessory", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "priyanka.dudhat@snapdevio.com", name: "Charger", serial: "SD-PRD-003", manufacturer: "Dell", category: "Accessory", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "priyanka.dudhat@snapdevio.com", name: "Mouse Pad", serial: "SD-PRD-004", manufacturer: "Generic", category: "Accessory", ownershipTag: "Asset Company" });
+
+  // Jenish Bhadani
+  await createAssetWithAssignment({ userEmail: "jenish.bhadani@snapdevio.com", name: "Dell Laptop", serial: "SD-JB-001", manufacturer: "Dell", category: "Laptop", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "jenish.bhadani@snapdevio.com", name: "Charger 65W", serial: "SD-JB-002", manufacturer: "Dell", category: "Accessory", ownershipTag: "Asset Company" });
+
+  // Chirag Chovatiya
+  await createAssetWithAssignment({ userEmail: "chirag.chovatiya@snapdevio.com", name: "Dell 5520 16/256", serial: "4F49BA60-EE6B-4B1F-A513-C617E942772E", model:"DELL-5520", manufacturer: "Dell", category: "Laptop", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "chirag.chovatiya@snapdevio.com", name: "Mouse", serial: "2204HS002298",model:"M-U-0026", manufacturer: "Logitech", category: "Accessory", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "chirag.chovatiya@snapdevio.com", name: "Charger", serial: "----", manufacturer: "Dell", category: "Accessory", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "chirag.chovatiya@snapdevio.com", name: "Mouse Pad", serial: "-----", manufacturer: "Info computer", category: "Accessory", ownershipTag: "Asset Company" });
+
+  // Gaurav Malviya
+  await createAssetWithAssignment({ userEmail: "gaurav.malviya@snapdevio.com", name: "MacBook", serial: "SD-GM-001", manufacturer: "Apple", category: "Laptop", ownershipTag: "Asset Private" });
+  await createAssetWithAssignment({ userEmail: "gaurav.malviya@snapdevio.com", name: "Charger", serial: "SD-GM-002", manufacturer: "Apple", category: "Accessory", ownershipTag: "Asset Private" });
+
+  // Shivang Dave
+  await createAssetWithAssignment({ userEmail: "shivang.dave@snapdevio.com", name: "Dell Laptop", serial: "SD-SD-001", manufacturer: "Dell", category: "Laptop", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "shivang.dave@snapdevio.com", name: "Mouse", serial: "SD-SD-002", manufacturer: "Logitech", category: "Accessory", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "shivang.dave@snapdevio.com", name: "Charger", serial: "SD-SD-003", manufacturer: "Dell", category: "Accessory", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "shivang.dave@snapdevio.com", name: "Mouse Pad", serial: "SD-SD-004", manufacturer: "Generic", category: "Accessory", ownershipTag: "Asset Company" });
+
+  // Rakesh Gosalia
+  await createAssetWithAssignment({ userEmail: "rakesh.gosalia@snapdevio.com", name: "Dell Laptop", serial: "SD-RG-001", manufacturer: "Dell", category: "Laptop", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "rakesh.gosalia@snapdevio.com", name: "Charger", serial: "SD-RG-002", manufacturer: "Dell", category: "Accessory", ownershipTag: "Asset Company" });
+
+  // Jayendra Ramani
+  await createAssetWithAssignment({ userEmail: "jayendra.ramani@snapdevio.com", name: "Asus ROG Strix Laptop", description:"", serial: "SD-JR-001", model:"", manufacturer: "Asus", category: "Laptop", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "jayendra.ramani@snapdevio.com", name: "Charger", serial: "SD-JR-002", manufacturer: "Asus", category: "Accessory", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "jayendra.ramani@snapdevio.com", name: "Mouse", serial: "SD-JR-003", manufacturer: "Logitech", category: "Accessory", ownershipTag: "Asset Company" });
+  await createAssetWithAssignment({ userEmail: "jayendra.ramani@snapdevio.com", name: "Mouse Pad", serial: "SD-JR-004", manufacturer: "Generic", category: "Accessory", ownershipTag: "Asset Company" });
 
   console.log("🏢 Created Snapdevio with users and assets");
 
@@ -186,15 +372,18 @@ async function main() {
     { email: "david.lee@techcorp.com", firstName: "David", lastName: "Lee", role: Role.USER },
   ];
 
-  // Create all TechCorp users
-  await prisma.user.createMany({
-    data: techCorpUsersData.map((user) => ({
-      ...user,
-      password: hashedPassword,
-      isActive: true,
-      companyId: techCorp.id,
-    })),
-  });
+  // Create TechCorp users with individual passwords
+  const techCorpPassword = await bcrypt.hash("password123", 10);
+  for (const userData of techCorpUsersData) {
+    await prisma.user.create({
+      data: {
+        ...userData,
+        password: techCorpPassword,
+        isActive: true,
+        companyId: techCorp.id,
+      },
+    });
+  }
 
   // Fetch created users for references
   const techCorpUsersList = await prisma.user.findMany({
@@ -281,16 +470,21 @@ async function main() {
   console.log("✅ Seed completed successfully!");
   console.log("\n📊 Summary:");
   console.log("- Companies: 2 (Snapdevio, TechCorp Solutions)");
-  console.log("- Users: 10 (5 per company - 1 Owner, 1 Admin, 3 Users)");
-  console.log("- Assets: 19");
-  console.log("- Assignments: 14");
-  console.log("\n🔑 Login credentials (all users):");
-  console.log("   Password: password123");
+  console.log("- Snapdevio Users: 36 (1 Owner, 2 Admins, 33 Users)");
+  console.log("- TechCorp Users: 5 (1 Owner, 1 Admin, 3 Users)");
+  console.log("- Snapdevio Assets: ~180+ (individual assets with assignments)");
+  console.log("- TechCorp Assets: 10");
+  console.log("\n🔑 Login credentials:");
+  console.log("Snapdevio:");
+  console.log("  - Owner/Admin: password123");
+  console.log("  - Users: firstname@snapdevio406 (e.g., jayendra@snapdevio406)");
+  console.log("TechCorp:");
+  console.log("  - All users: password123");
   console.log("\n👤 Sample users:");
   console.log("Snapdevio:");
   console.log("- Owner: owner@snapdevio.com");
   console.log("- Admin: admin@snapdevio.com");
-  console.log("- User: jayendra.ramani@snapdevio.com");
+  console.log("- User: jayendra.ramani@snapdevio.com (password: jayendra@snapdevio406)");
   console.log("TechCorp:");
   console.log("- Owner: owner@techcorp.com");
   console.log("- Admin: admin@techcorp.com");

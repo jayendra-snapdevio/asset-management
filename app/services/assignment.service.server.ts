@@ -285,7 +285,8 @@ export async function createAssignment(data: {
  */
 export async function returnAssignment(
   assignmentId: string,
-  notes?: string
+  notes?: string,
+  userId?: string
 ) {
   const assignment = await prisma.assignment.findUnique({
     where: { id: assignmentId },
@@ -293,6 +294,10 @@ export async function returnAssignment(
 
   if (!assignment) {
     return { error: "Assignment not found" };
+  }
+
+  if (userId && assignment.userId !== userId) {
+    return { error: "You are not authorized to return this assignment" };
   }
 
   if (assignment.status !== "ACTIVE") {
@@ -306,7 +311,7 @@ export async function returnAssignment(
       data: {
         status: "RETURNED",
         returnDate: new Date(),
-        notes: notes || assignment.notes,
+        notes: notes ? `${assignment.notes || ""}\nReturn notes: ${notes}`.trim() : assignment.notes,
       },
     }),
     prisma.asset.update({

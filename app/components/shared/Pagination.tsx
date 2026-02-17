@@ -34,8 +34,8 @@ export function Pagination({
   if (pagination.totalPages === 0) return null;
 
   return (
-    <div className={cn("flex items-center justify-between px-6 py-4 border-t", className)}>
-      <div className="flex items-center gap-4">
+    <div className={cn("px-6 py-4 border-t", className)}>
+      <div className="flex flex-col md:flex-row justify-between w-full items-center gap-4">
         {showShowing ? (
           <p className="text-sm text-muted-foreground whitespace-nowrap">
             Showing {(pagination.page - 1) * pagination.limit + 1} to{" "}
@@ -47,7 +47,8 @@ export function Pagination({
             Page {pagination.page} of {pagination.totalPages}
           </div>
         )}
-        <div className="flex items-center gap-2">
+
+        <div className="flex flex-row items-center gap-2">
           <span className="text-sm text-muted-foreground whitespace-nowrap">
             Rows per page:
           </span>
@@ -55,7 +56,7 @@ export function Pagination({
             value={pagination.limit.toString()}
             onValueChange={onLimitChange}
           >
-            <SelectTrigger className="h-8 w-[80px]">
+            <SelectTrigger size="sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -66,8 +67,8 @@ export function Pagination({
             </SelectContent>
           </Select>
         </div>
-      </div>
-      <div className="flex items-center gap-2">
+
+      <div className="flex flex-rows items-center gap-2">
         <Button
           variant="outline"
           size="sm"
@@ -75,7 +76,6 @@ export function Pagination({
           disabled={pagination.page <= 1}
         >
           <ChevronLeft className="h-4 w-4" />
-          Previous
         </Button>
         {showShowing && (
           <span className="text-sm text-muted-foreground">
@@ -86,11 +86,11 @@ export function Pagination({
           variant="outline"
           size="sm"
           onClick={() => onPageChange(pagination.page + 1)}
-          disabled={pagination.page >= pagination.totalPages}
-        >
-          Next
+          disabled={pagination.page >= pagination.totalPages}>
           <ChevronRight className="h-4 w-4" />
         </Button>
+      </div>
+
       </div>
     </div>
   );

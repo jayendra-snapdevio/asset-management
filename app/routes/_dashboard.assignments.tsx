@@ -66,13 +66,14 @@ export async function loader({ request }: Route.LoaderArgs) {
   const { assignments, pagination } = await getAssignments(
     companyFilter,
     { page, limit },
-    { 
+    {
       status: status || undefined,
       userId: user.role === "USER" ? user.id : undefined,
     },
   );
 
-  return { user, assignments,    pagination,
+  return {
+    user, assignments, pagination,
   };
 }
 
@@ -87,7 +88,7 @@ export async function action({ request }: Route.ActionArgs) {
     if (!assignmentId) {
       return data({ error: "Assignment ID is required", success: false }, { status: 400 });
     }
-    
+
     try {
       const result = await deleteAssignment(assignmentId, companyFilter);
       if (result.error) {
@@ -189,13 +190,13 @@ export default function AssignmentsPage({ loaderData, actionData }: Route.Compon
           {"message" in actionData ? (actionData.message as string) : "Action completed successfully"}
         </div>
       )}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold">Assignments</h1>
           <p className="text-muted-foreground">Manage asset assignments</p>
         </div>
         <Link to={canManageAssignments ? "/dashboard/assignments/new" : "/dashboard/user/assignments/new"}>
-          <Button>
+          <Button className="w-full md:w-[180px]">
             <Plus className="h-4 w-4 mr-2" />
             New Assignment
           </Button>
@@ -238,7 +239,7 @@ export default function AssignmentsPage({ loaderData, actionData }: Route.Compon
                 value={currentStatus || "all"}
                 onValueChange={handleStatusChange}
               >
-                <SelectTrigger>
+                <SelectTrigger className="w-full md:w-[180px]">
                   <SelectValue placeholder="All Statuses" />
                 </SelectTrigger>
                 <SelectContent>
@@ -360,7 +361,7 @@ export default function AssignmentsPage({ loaderData, actionData }: Route.Compon
                             <Eye className="h-3 w-3" />
                           </Link>
                         </Button>
-                        
+
                         {canManageAssignments && (
                           <>
                             <Button asChild variant="ghost" size="icon" className="h-8 w-8" title="Edit assignment">
@@ -368,7 +369,7 @@ export default function AssignmentsPage({ loaderData, actionData }: Route.Compon
                                 <Edit2 className="h-3 w-3" />
                               </Link>
                             </Button>
-                            
+
                             <Dialog>
                               <DialogTrigger asChild>
                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" title="Delete assignment">
@@ -379,7 +380,7 @@ export default function AssignmentsPage({ loaderData, actionData }: Route.Compon
                                 <DialogHeader>
                                   <DialogTitle>Delete Assignment</DialogTitle>
                                   <DialogDescription>
-                                    Are you sure you want to delete this assignment for {assignment.asset.name}? 
+                                    Are you sure you want to delete this assignment for {assignment.asset.name}?
                                     {assignment.status === "ACTIVE" && " This will return the asset status to AVAILABLE."}
                                     This action cannot be undone.
                                   </DialogDescription>

@@ -29,7 +29,7 @@ import {
 } from "~/components/ui/table";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
-import { Package, ArrowRight } from "lucide-react";
+import { Package, ArrowRight, Building2, Shield, UserCheck, CheckCircle } from "lucide-react";
 
 export function meta() {
   return [
@@ -71,7 +71,7 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
       <p className="text-red-600 mt-2">
         {error instanceof Error ? error.message : "An unknown error occurred"}
       </p>
-      <Button asChild variant="outline" className="mt-4">
+      <Button asChild variant="ghost" className="mt-4">
         <Link to="/dashboard">Try Again</Link>
       </Button>
     </div>
@@ -83,7 +83,7 @@ export default function DashboardIndex({ loaderData }: Route.ComponentProps) {
 
   // User Dashboard
   if (isUserDashboard) {
-    const { myAssets, history, stats } = loaderData as {
+    const { myAssets, history, ownedAssets, stats } = loaderData as {
       myAssets: Array<{
         id: string;
         assignedDate: Date;
@@ -107,8 +107,16 @@ export default function DashboardIndex({ loaderData }: Route.ComponentProps) {
           category: string | null;
         };
       }>;
+      ownedAssets: Array<{
+        id: string;
+        name: string;
+        serialNumber: string | null;
+        category: string | null;
+        status: string;
+      }>;
       stats: {
         currentAssets: number;
+        ownedAssets: number;
         totalAssigned: number;
         totalReturned: number;
       };
@@ -128,7 +136,7 @@ export default function DashboardIndex({ loaderData }: Route.ComponentProps) {
         </div>
 
         {/* User Stats */}
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-4">
           <StatCard
             title="Total Assigned"
             value={stats.totalAssigned}
@@ -140,6 +148,12 @@ export default function DashboardIndex({ loaderData }: Route.ComponentProps) {
             value={stats.currentAssets}
             icon="Package"
             description="Currently assigned to you"
+          />
+          <StatCard
+            title="Owned Assets"
+            value={stats.ownedAssets}
+            icon="Shield"
+            description="Assets you own"
           />
           <StatCard
             title="Returned"
@@ -187,6 +201,55 @@ export default function DashboardIndex({ loaderData }: Route.ComponentProps) {
                       <TableCell>{assignment.asset.category || "-"}</TableCell>
                       <TableCell>
                         {formatDate(assignment.assignedDate)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Owned Assets */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5" />
+              My Owned Assets
+            </CardTitle>
+            <CardDescription>Assets where you are the registered owner</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {ownedAssets.length === 0 ? (
+              <p className="text-muted-foreground text-center py-8">
+                No owned assets found.
+              </p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Asset Name</TableHead>
+                    <TableHead>Serial Number</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {ownedAssets.map((asset) => (
+                    <TableRow key={asset.id}>
+                      <TableCell className="font-medium">
+                        <Link className="hover:underline" to={`/dashboard/assets/${asset.id}`}>
+                          {asset.name}
+                        </Link>
+                      </TableCell>
+                      <TableCell>
+                        {asset.serialNumber || "-"}
+                      </TableCell>
+                      <TableCell>{asset.category || "-"}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">
+                          {asset.status}
+                        </Badge>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -281,23 +344,24 @@ export default function DashboardIndex({ loaderData }: Route.ComponentProps) {
         status: string;
         assignedDate: Date;
         returnDate: Date | null;
-        asset: { id: string; name: string };
+        asset: { id: string; name: string; companyName?: string };
         user: { id: string; firstName: string; lastName: string };
       }>;
       user: { firstName: string; lastName: string; role: string };
       isUserDashboard: boolean;
     };
-
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Dashboard</h1>
+          <h1 className="text-3xl font-bold">
+            {(user as any).company?.name ? `${(user as any).company.name} Dashboard` : "Dashboard"}
+          </h1>
           <p className="text-muted-foreground">
             Welcome back, {user.firstName}! Here's your asset overview.
           </p>
         </div>
-        <Button asChild>
+        <Button asChild className="w-full md:w-[180px]">
           <Link to="/dashboard/assets">
             View All Assets
             <ArrowRight className="h-4 w-4 ml-2" />
@@ -344,7 +408,7 @@ export default function DashboardIndex({ loaderData }: Route.ComponentProps) {
       </div>
 
       {/* Recent Data */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="flex flex-col lg:flex-row gap-6">
         <RecentAssetsTable assets={recentAssets} />
         <ActivityFeed activities={recentActivity} />
       </div>

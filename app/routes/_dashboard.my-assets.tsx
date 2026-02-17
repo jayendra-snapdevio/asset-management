@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { data, Form, Link, useNavigation } from "react-router";
 import type { Route } from "./+types/_dashboard.my-assets";
-import { requireAuth } from "~/lib/session.server";
-import { prisma } from "~/lib/db.server";
+// Server-only imports moved to loader to avoid Vite leakage
+import type { AssetStatus, AssignmentStatus } from "@prisma/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
@@ -25,19 +25,21 @@ import {
   DialogTrigger,
 } from "~/components/ui/dialog";
 import { Alert, AlertDescription } from "~/components/ui/alert";
-import { Laptop, History, RotateCcw, Loader2, AlertCircle, Package, Eye } from "lucide-react";
+import { Laptop, History, RotateCcw, Loader2, AlertCircle, Package, Eye, Shield } from "lucide-react";
 import { formatDuration } from "~/lib/utils";
 import { formatDate } from "~/lib/date";
-import type { AssignmentStatus } from "@prisma/client";
+// AssignmentStatus moved to top level type imports
 
 export function meta() {
   return [{ title: "My Assets - Asset Management" }];
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
+  const { requireAuth } = await import("../lib/session.server");
+  const { prisma } = await import("../lib/db.server");
   const user = await requireAuth(request);
 
-  const [currentAssets, history] = await Promise.all([
+  const [currentAssets, history, ownedAssets] = await Promise.all([
     prisma.assignment.findMany({
       where: { userId: user.id, status: "ACTIVE" },
       include: {
@@ -49,7 +51,16 @@ export async function loader({ request }: Route.LoaderArgs) {
             model: true,
             manufacturer: true,
             category: true,
+            status: true,
             imageUrl: true,
+            ownershipType: true,
+            otherOwnership: true,
+            owner: {
+              select: {
+                firstName: true,
+                lastName: true,
+              },
+            },
           },
         },
       },
@@ -57,58 +68,55 @@ export async function loader({ request }: Route.LoaderArgs) {
     }),
     prisma.assignment.findMany({
       where: { userId: user.id, status: { not: "ACTIVE" } },
-      orderBy: { returnDate: "desc" },
-      take: 20,
       include: {
-        asset: {
-          select: {
-            id: true,
-            name: true,
-            serialNumber: true,
-            category: true,
-          },
+        asset: true,
+      },
+      orderBy: { returnDate: "desc" },
+      take: 10,
+    }),
+    prisma.asset.findMany({
+      where: { ownerId: user.id },
+      include: {
+        assignments: {
+          where: { status: "ACTIVE" },
+          include: { user: true },
+          take: 1,
         },
       },
+      orderBy: { createdAt: "desc" },
     }),
   ]);
 
-  return { user, currentAssets, history };
+  return { currentAssets, history, ownedAssets, user };
 }
 
 export async function action({ request }: Route.ActionArgs) {
+  const { requireAuth } = await import("../lib/session.server");
+  const { prisma } = await import("../lib/db.server");
   const user = await requireAuth(request);
   const formData = await request.formData();
-  const assignmentId = formData.get("assignmentId") as string;
-  const notes = formData.get("notes") as string;
+  const intent = formData.get("intent");
 
-  const assignment = await prisma.assignment.findUnique({
-    where: { id: assignmentId },
-  });
+  if (intent === "return") {
+    const { returnAssignment } = await import("../services/assignment.service.server");
+    const assignmentId = formData.get("assignmentId") as string;
+    const notes = formData.get("notes") as string;
 
-  if (!assignment || assignment.userId !== user.id) {
-    return data({ error: "Assignment not found" }, { status: 404 });
+    try {
+      const result = await returnAssignment(assignmentId, notes || undefined, user.id);
+
+      if (result.error) {
+        return data({ error: result.error }, { status: 400 });
+      }
+
+      return data({ success: true });
+    } catch (error) {
+      const { handleError } = await import("../lib/errors.server");
+      return handleError(error);
+    }
   }
 
-  if (assignment.status !== "ACTIVE") {
-    return data({ error: "Assignment is not active" }, { status: 400 });
-  }
-
-  await prisma.$transaction([
-    prisma.assignment.update({
-      where: { id: assignmentId },
-      data: {
-        status: "RETURNED",
-        returnDate: new Date(),
-        notes: notes || assignment.notes,
-      },
-    }),
-    prisma.asset.update({
-      where: { id: assignment.assetId },
-      data: { status: "AVAILABLE" },
-    }),
-  ]);
-
-  return data({ success: true });
+  return null;
 }
 
 function getStatusBadge(status: AssignmentStatus) {
@@ -125,7 +133,7 @@ function getStatusBadge(status: AssignmentStatus) {
 }
 
 export default function MyAssetsPage({ loaderData, actionData }: Route.ComponentProps) {
-  const { currentAssets, history } = loaderData;
+  const { currentAssets, history, ownedAssets } = loaderData;
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
   const [returnDialogOpen, setReturnDialogOpen] = useState<string | null>(null);
@@ -206,6 +214,20 @@ export default function MyAssetsPage({ loaderData, actionData }: Route.Component
                           {formatDate(assignment.dueDate)}
                         </p>
                       )}
+                      <p>
+                        <span className="text-muted-foreground">Ownership:</span>{" "}
+                        <span className="capitalize">{assignment.asset.ownershipType?.toLowerCase()}</span>
+                        {assignment.asset.ownershipType === "PRIVATE" && assignment.asset.owner && (
+                          <span className="text-muted-foreground ml-1 text-xs">
+                            ({assignment.asset.owner.firstName} {assignment.asset.owner.lastName})
+                          </span>
+                        )}
+                        {assignment.asset.ownershipType === "OTHER" && assignment.asset.otherOwnership && (
+                          <span className="text-muted-foreground ml-1 text-xs">
+                            ({assignment.asset.otherOwnership})
+                          </span>
+                        )}
+                      </p>
                     </div>
 
                     <div className="flex gap-2 pt-2">
@@ -215,7 +237,7 @@ export default function MyAssetsPage({ loaderData, actionData }: Route.Component
                           View
                         </Button>
                       </Link>
-                      
+
                       <Dialog
                         open={returnDialogOpen === assignment.id}
                         onOpenChange={(open) =>
@@ -237,11 +259,18 @@ export default function MyAssetsPage({ loaderData, actionData }: Route.Component
                             </DialogDescription>
                           </DialogHeader>
                           <Form method="post" className="space-y-4">
+                            <input type="hidden" name="intent" value="return" />
                             <input
                               type="hidden"
                               name="assignmentId"
                               value={assignment.id}
                             />
+                            {actionData && "error" in actionData && actionData.error && (
+                              <Alert variant="destructive">
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertDescription>{actionData.error}</AlertDescription>
+                              </Alert>
+                            )}
                             <div className="space-y-2">
                               <Label htmlFor={`notes-${assignment.id}`}>
                                 Notes (Optional)
@@ -276,6 +305,62 @@ export default function MyAssetsPage({ loaderData, actionData }: Route.Component
                 </Card>
               ))}
             </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Owned Assets Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5" />
+            My Owned Assets ({ownedAssets.length})
+          </CardTitle>
+          <CardDescription>
+            Assets where you are the registered owner
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {ownedAssets.length === 0 ? (
+            <p className="text-muted-foreground text-center py-8">
+              No owned assets found.
+            </p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Asset Name</TableHead>
+                  <TableHead>Serial Number</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {ownedAssets.map((asset) => (
+                  <TableRow key={asset.id}>
+                    <TableCell className="font-medium">
+                      <Link
+                        to={`/dashboard/assets/${asset.id}`}
+                        className="hover:underline text-primary"
+                      >
+                        {asset.name}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      {asset.serialNumber || "-"}
+                    </TableCell>
+                    <TableCell className="capitalize">
+                      {asset.category || "-"}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">
+                        {asset.status}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>

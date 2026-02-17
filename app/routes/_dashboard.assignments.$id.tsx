@@ -94,14 +94,13 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   if (intent === "return") {
-    // Users can only return their own assignments
-    if (user.role === "USER" && assignment.userId !== user.id) {
-      return errorResponse("You can only return assets assigned to you", 403);
-    }
-
     const notes = formData.get("notes") as string;
     try {
-      const result = await returnAssignment(params.id!, notes || undefined);
+      const result = await returnAssignment(
+        params.id!,
+        notes || undefined,
+        user.role === "USER" ? user.id : undefined
+      );
 
       if (result.error) {
         return errorResponse(result.error);
@@ -187,23 +186,25 @@ export default function AssignmentDetailPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Link to="/dashboard/assignments">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-        </Link>
-        <div className="flex-1">
-          <h1 className="text-3xl font-bold">Assignment Details</h1>
-          <p className="text-muted-foreground">
-            View and manage this assignment
-          </p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <Link to="/dashboard/assignments">
+            <Button variant="ghost" size="icon">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </Link>
+          <div className="flex-1">
+            <h1 className="text-3xl font-bold">Assignment Details</h1>
+            <p className="text-muted-foreground">
+              View and manage this assignment
+            </p>
+          </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col md:flex-row gap-2">
           {canReturn && (
             <Dialog open={returnDialogOpen} onOpenChange={setReturnDialogOpen}>
               <DialogTrigger asChild>
-                <Button variant="outline">
+                <Button variant="outline" className="w-full md:w-[180px]">
                   <RotateCcw className="h-4 w-4 mr-2" />
                   Return Asset
                 </Button>
@@ -218,6 +219,12 @@ export default function AssignmentDetailPage({
                 </DialogHeader>
                 <Form method="post" className="space-y-4">
                   <input type="hidden" name="intent" value="return" />
+                  {actionData?.error && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>{actionData.error}</AlertDescription>
+                    </Alert>
+                  )}
                   <FormTextarea
                     label="Notes (Optional)"
                     name="notes"

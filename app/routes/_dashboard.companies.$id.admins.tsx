@@ -248,7 +248,7 @@ export default function CompanyAdminsPage({
     }
   }, [actionData]);
 
-const errors = actionData?.errors as Record<string, string[]> | undefined;
+  const errors = actionData?.errors as Record<string, string[]> | undefined;
   const users = company.users as CompanyUser[];
   const admins = users.filter((u) => u.role === "ADMIN");
   const regularUsers = users.filter((u) => u.role === "USER");
@@ -277,11 +277,10 @@ const errors = actionData?.errors as Record<string, string[]> | undefined;
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+      <div className="flex flex-row items-center gap-4">
         <Button asChild variant="ghost" size="sm" className="w-fit">
           <Link to={`/dashboard/companies/${company.id}`}>
             <ArrowLeft className="h-4 w-4 mr-1" />
-            Back to Company
           </Link>
         </Button>
         <div>
@@ -407,11 +406,11 @@ const errors = actionData?.errors as Record<string, string[]> | undefined;
                     required
                     error={errors?.email}
                   />
-                    <PasswordToggleField
-                      name="password"
-                      label="Password"
-                      errors={errors?.password}
-                    />
+                  <PasswordToggleField
+                    name="password"
+                    label="Password"
+                    errors={errors?.password}
+                  />
                   <DialogFooter>
                     <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                       Cancel
@@ -447,42 +446,42 @@ const errors = actionData?.errors as Record<string, string[]> | undefined;
           ) : (
             <div className="overflow-x-auto">
               <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {admins.map((admin) => (
-                  <TableRow key={admin.id}>
-                    <TableCell className="font-medium">
-                      {admin.firstName} {admin.lastName}
-                    </TableCell>
-                    <TableCell>{admin.email}</TableCell>
-                    <TableCell>{getRoleBadge(admin.role)}</TableCell>
-                    <TableCell className="text-right">
-                      <Form method="post" className="inline">
-                        <input type="hidden" name="intent" value="remove-admin" />
-                        <input type="hidden" name="userId" value={admin.id} />
-                        <Button
-                          type="submit"
-                          variant="destructive"
-                          size="sm"
-                          disabled={isSubmitting}
-                        >
-                          <UserMinus className="h-4 w-4 mr-1" />
-                          Remove
-                        </Button>
-                      </Form>
-                    </TableCell>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {admins.map((admin) => (
+                    <TableRow key={admin.id}>
+                      <TableCell className="font-medium">
+                        {admin.firstName} {admin.lastName}
+                      </TableCell>
+                      <TableCell>{admin.email}</TableCell>
+                      <TableCell>{getRoleBadge(admin.role)}</TableCell>
+                      <TableCell className="text-right">
+                        <Form method="post" className="inline">
+                          <input type="hidden" name="intent" value="remove-admin" />
+                          <input type="hidden" name="userId" value={admin.id} />
+                          <Button
+                            type="submit"
+                            variant="destructive"
+                            size="sm"
+                            disabled={isSubmitting}
+                          >
+                            <UserMinus className="h-4 w-4 mr-1" />
+                            Remove Admin
+                          </Button>
+                        </Form>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -507,6 +506,7 @@ const errors = actionData?.errors as Record<string, string[]> | undefined;
                     <TableHead>Name</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Role</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -517,6 +517,21 @@ const errors = actionData?.errors as Record<string, string[]> | undefined;
                       </TableCell>
                       <TableCell className="whitespace-nowrap">{user.email}</TableCell>
                       <TableCell>{getRoleBadge(user.role)}</TableCell>
+                      <TableCell className="text-right">
+                        <Form method="post" className="inline">
+                          <input type="hidden" name="intent" value="add-admin" />
+                          <input type="hidden" name="email" value={user.email} />
+                          <Button
+                            type="submit"
+                            variant="outline"
+                            size="sm"
+                            disabled={isSubmitting}
+                          >
+                            <Shield className="h-4 w-4 mr-1 text-primary" />
+                            Promote as Admin
+                          </Button>
+                        </Form>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

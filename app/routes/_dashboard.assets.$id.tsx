@@ -1,15 +1,10 @@
 import { useState } from "react";
 import { data, redirect, Form, Link, useNavigation } from "react-router";
 import type { Route } from "./+types/_dashboard.assets.$id";
-import { requireRole, requireAuth } from "~/lib/session.server";
-import { getCompanyFilter } from "~/services/company.service.server";
-import { handleError, errorResponse } from "~/lib/errors.server";
-import { getAssetById, updateAsset, deleteAsset, restoreAsset, regenerateQRCode } from "~/services/asset.service.server";
-import { updateAssetSchema } from "~/validators/asset.validator";
-import { prisma } from "~/lib/db.server";
-import { unlink } from "fs/promises";
-import { join } from "path";
+// Server-only imports moved to loader/action to avoid Vite leakage
 import type { AssetStatus, AssignmentStatus, OwnershipType } from "@prisma/client";
+import { updateAssetSchema } from "../validators/asset.validator";
+import { handleError, errorResponse } from "../lib/errors.server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
@@ -35,6 +30,7 @@ import {
 } from "~/components/ui/table";
 import {
   ArrowLeft,
+  AlertCircle,
   Loader2,
   Trash2,
   RotateCcw,
@@ -48,11 +44,12 @@ import {
   Package,
 } from "lucide-react";
 import { ASSET_STATUS_LABELS, ASSET_STATUS_COLORS, ASSET_CATEGORIES, ASSIGNMENT_STATUS_LABELS, ASSIGNMENT_STATUS_COLORS, OWNERSHIP_TYPE_LABELS, OWNERSHIP_TYPE_OPTIONS } from "~/constants";
-import { getUsers } from "~/services/user.service.server";
+// getUsers moved to loader
 import { format } from "date-fns";
 import { ImageUpload } from "~/components/assets/ImageUpload";
 import { formatDuration } from "~/lib/utils";
 import { SuccessMessage } from "~/components/ui/success-message";
+import { Alert, AlertDescription } from "~/components/ui/alert";
 import type { AssetDetail } from "~/types";
 
 export function meta({ data }: Route.MetaArgs) {
@@ -61,6 +58,11 @@ export function meta({ data }: Route.MetaArgs) {
 }
 
 export async function loader({ request, params }: Route.LoaderArgs) {
+  const { requireAuth } = await import("../lib/session.server");
+  const { getCompanyFilter } = await import("../services/company.service.server");
+  const { getAssetById } = await import("../services/asset.service.server");
+  const { getUsers } = await import("../services/user.service.server");
+
   const user = await requireAuth(request);
   const companyFilter = await getCompanyFilter(user);
 
@@ -81,8 +83,34 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
-  const user = await requireRole(request, ["OWNER", "ADMIN"]);
+  const { requireAuth } = await import("../lib/session.server");
+  const { getCompanyFilter } = await import("../services/company.service.server");
+  const {
+    getAssetById,
+    updateAsset,
+    deleteAsset,
+    restoreAsset,
+    regenerateQRCode,
+    deleteAssetImage,
+  } = await import("../services/asset.service.server");
+  const { returnAssignment } = await import("../services/assignment.service.server");
+
+  const user = await requireAuth(request);
   const companyFilter = await getCompanyFilter(user);
+
+  const asset = await getAssetById(params.id!, companyFilter);
+  if (!asset) {
+    throw redirect("/dashboard/assets");
+  }
+
+  const isOwnerOrCreator = asset.ownerId === user.id || asset.createdById === user.id;
+  const isAdminOrOwner = user.role === "OWNER" || user.role === "ADMIN";
+  const canModify = isAdminOrOwner || isOwnerOrCreator;
+
+  if (!canModify) {
+    return errorResponse("You don't have permission to modify this asset.");
+  }
+
   const formData = await request.formData();
   const intent = formData.get("intent") as string;
 
@@ -174,19 +202,33 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 
   if (intent === "delete-image") {
-    const asset = await prisma.asset.findUnique({ where: { id: params.id } });
-    if (asset?.imageUrl) {
-      try {
-        await unlink(join(process.cwd(), "public", asset.imageUrl));
-      } catch {
-        // Ignore if file doesn't exist
-      }
-      await prisma.asset.update({
-        where: { id: params.id },
-        data: { imageUrl: null },
-      });
+    try {
+      await deleteAssetImage(params.id!, companyFilter);
+      return data({ success: true, error: undefined, errors: undefined });
+    } catch (error) {
+      return handleError(error);
     }
-    return data({ success: true, error: undefined, errors: undefined });
+  }
+
+  if (intent === "return") {
+    const assignmentId = formData.get("assignmentId") as string;
+    const notes = formData.get("notes") as string;
+
+    if (!assignmentId) {
+      return errorResponse("Assignment ID is required");
+    }
+
+    try {
+      const result = await returnAssignment(assignmentId, notes || undefined);
+
+      if (result.error) {
+        return errorResponse(result.error);
+      }
+
+      return data({ success: true, error: undefined, errors: undefined });
+    } catch (error) {
+      return handleError(error);
+    }
   }
 
   return null;
@@ -202,9 +244,19 @@ export default function AssetDetailPage({ loaderData, actionData }: Route.Compon
   const [category, setCategory] = useState(typedAsset.category || "");
   const [status, setStatus] = useState(typedAsset.status);
   const [ownershipType, setOwnershipType] = useState(typedAsset.ownershipType);
+  const [returnDialogOpen, setReturnDialogOpen] = useState(false);
 
-  const canEdit = user.role === "OWNER" || user.role === "ADMIN";
+  const canEdit =
+    user.role === "OWNER" ||
+    user.role === "ADMIN" ||
+    typedAsset.ownerId === user.id ||
+    typedAsset.createdBy?.id === user.id;
   const activeAssignment = typedAsset.assignments.find((a) => a.status === ("ACTIVE" as AssignmentStatus));
+  const canReturn = activeAssignment && (
+    user.role === "OWNER" ||
+    user.role === "ADMIN" ||
+    activeAssignment.user.id === user.id
+  );
 
   const getStatusBadge = (assetStatus: AssetStatus) => {
     return (
@@ -233,7 +285,7 @@ export default function AssetDetailPage({ loaderData, actionData }: Route.Compon
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           {user.role === "OWNER" || user.role === "ADMIN" ? (
             <Link to="/dashboard/assets">
@@ -248,24 +300,25 @@ export default function AssetDetailPage({ loaderData, actionData }: Route.Compon
               </Button>
             </Link>
           )}
-          <div>
+          <div className="flex flex-col">
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold">{typedAsset.name}</h1>
+
+              <h1 className="text-2xl md:text-3xl font-bold">{typedAsset.name}</h1>
               {getStatusBadge(typedAsset.status)}
             </div>
-            <p className="text-muted-foreground">
-              {typedAsset.category ? typedAsset.category : "No category"} • 
+            <p className="text-muted-foreground text-sm md:text-base">
+              {typedAsset.category ? typedAsset.category : "No category"} •
               Added {format(new Date(typedAsset.createdAt), "MMM d, yyyy")}
             </p>
           </div>
         </div>
 
         {canEdit && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col md:flex-row gap-2">
             {typedAsset.status === "RETIRED" ? (
               <Form method="post">
                 <input type="hidden" name="intent" value="restore" />
-                <Button type="submit" variant="outline" disabled={isSubmitting}>
+                <Button type="submit" variant="outline" className="w-full md:w-[180px]" disabled={isSubmitting}>
                   <RotateCcw className="h-4 w-4 mr-2" />
                   Restore Asset
                 </Button>
@@ -288,6 +341,56 @@ export default function AssetDetailPage({ loaderData, actionData }: Route.Compon
                     </>
                   )}
                 </Button>
+
+                {canReturn && (
+                  <Dialog open={returnDialogOpen} onOpenChange={setReturnDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline">
+                        <RotateCcw className="h-4 w-4 mr-2" />
+                        Return Asset
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Return Asset</DialogTitle>
+                        <DialogDescription>
+                          Mark this asset as returned. It will become available for new assignments.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <Form method="post" className="space-y-4">
+                        <input type="hidden" name="intent" value="return" />
+                        <input type="hidden" name="assignmentId" value={activeAssignment.id} />
+                        {actionData?.error && (
+                          <Alert variant="destructive">
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertDescription>{actionData.error}</AlertDescription>
+                          </Alert>
+                        )}
+                        <FormTextarea
+                          label="Notes (Optional)"
+                          name="notes"
+                          placeholder="Add any notes about the return..."
+                          rows={3}
+                        />
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setReturnDialogOpen(false)}
+                          >
+                            Cancel
+                          </Button>
+                          <Button type="submit" disabled={isSubmitting}>
+                            {isSubmitting && (
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            )}
+                            Confirm Return
+                          </Button>
+                        </div>
+                      </Form>
+                    </DialogContent>
+                  </Dialog>
+                )}
 
                 <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
                   <DialogTrigger asChild>
@@ -327,6 +430,7 @@ export default function AssetDetailPage({ loaderData, actionData }: Route.Compon
             )}
           </div>
         )}
+
       </div>
 
       {/* Error/Success Messages */}

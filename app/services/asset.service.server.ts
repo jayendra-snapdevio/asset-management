@@ -1,6 +1,8 @@
 import { prisma } from "~/lib/db.server";
 import { generateQRCode } from "~/lib/qrcode.server";
 import type { Prisma, AssetStatus } from "@prisma/client";
+import { unlink } from "fs/promises";
+import { join } from "path";
 
 export interface AssetFilters {
   page: number;
@@ -11,6 +13,7 @@ export interface AssetFilters {
   sortBy?: string;
   sortOrder?: "asc" | "desc";
   userId?: string; // Filter by user (assigned or created)
+  ownerId?: string; // Filter by asset owner (PRIVATE ownership)
 }
 
 export interface AssetPagination {
@@ -51,28 +54,32 @@ export async function getAssets(
     sortBy = "createdAt",
     sortOrder = "desc",
     userId,
+    ownerId,
   } = filters;
 
   const baseFilter = normalizeCompanyFilter(companyFilter);
   
   const where: Prisma.AssetWhereInput = {
-    ...baseFilter,
-    // Filter out RETIRED status by default unless specifically requested
-    ...(status ? { status } : { status: { not: "RETIRED" } }),
-    ...(search && {
-      OR: [
-        { name: { contains: search, mode: "insensitive" as const } },
-        { serialNumber: { contains: search, mode: "insensitive" as const } },
-        { category: { contains: search, mode: "insensitive" as const } },
-      ],
-    }),
-    ...(category && { category }),
-    ...(userId && {
-      OR: [
-        { assignments: { some: { userId, status: "ACTIVE" } } },
-        { createdById: userId },
-      ],
-    }),
+    AND: [
+      baseFilter,
+      status ? { status } : { status: { not: "RETIRED" } },
+      category ? { category } : {},
+      ownerId ? { ownerId } : {},
+      search ? {
+        OR: [
+          { name: { contains: search, mode: "insensitive" as const } },
+          { serialNumber: { contains: search, mode: "insensitive" as const } },
+          { category: { contains: search, mode: "insensitive" as const } },
+        ],
+      } : {},
+      userId ? {
+        OR: [
+          { assignments: { some: { userId, status: "ACTIVE" } } },
+          { createdById: userId },
+          { ownerId: userId },
+        ],
+      } : {},
+    ],
   };
 
   // For categories, include all including retired
@@ -144,6 +151,7 @@ export async function getAssetById(
     where.OR = [
       { assignments: { some: { userId: checkAccessForUserId, status: "ACTIVE" } } },
       { createdById: checkAccessForUserId },
+      { ownerId: checkAccessForUserId },
     ];
   }
 
@@ -155,6 +163,9 @@ export async function getAssetById(
       },
       company: {
         select: { id: true, name: true },
+      },
+      owner: {
+        select: { id: true, firstName: true, lastName: true },
       },
       assignments: {
         orderBy: { createdAt: "desc" },
@@ -210,8 +221,8 @@ export async function createAsset(
         tags: data.tags || [],
         imageUrl: data.imageUrl || null,
         ownershipType: data.ownershipType || "COMPANY",
-        ownerId: data.ownerId || null,
-        otherOwnership: data.otherOwnership || null,
+        ownerId: data.ownershipType === "PRIVATE" ? (data.ownerId || null) : null,
+        otherOwnership: data.ownershipType === "OTHER" ? (data.otherOwnership || null) : null,
         status: "AVAILABLE",
         companyId,
         createdById,
@@ -303,8 +314,15 @@ export async function updateAsset(
         ...(data.category !== undefined && { category: data.category || null }),
         ...(data.tags !== undefined && { tags: data.tags }),
         ...(data.ownershipType !== undefined && { ownershipType: data.ownershipType }),
-        ...(data.ownerId !== undefined && { ownerId: data.ownerId || null }),
-        ...(data.otherOwnership !== undefined && { otherOwnership: data.otherOwnership || null }),
+        // If ownershipType is provided, clear irrelevant fields. 
+        // If not provided but ownerId/otherOwnership are, they will be updated as requested.
+        ...(data.ownershipType !== undefined ? {
+          ownerId: data.ownershipType === "PRIVATE" ? (data.ownerId || null) : null,
+          otherOwnership: data.ownershipType === "OTHER" ? (data.otherOwnership || null) : null,
+        } : {
+          ...(data.ownerId !== undefined && { ownerId: data.ownerId || null }),
+          ...(data.otherOwnership !== undefined && { otherOwnership: data.otherOwnership || null }),
+        }),
       },
       include: {
         createdBy: {
@@ -415,4 +433,39 @@ export async function regenerateQRCode(
   });
 
   return { qrCode };
+}
+
+/**
+ * Delete asset image and unlink file
+ */
+export async function deleteAssetImage(
+  assetId: string,
+  companyFilter: { companyId: string | null } | { companyId: { in: string[] } }
+) {
+  const baseFilter = normalizeCompanyFilter(companyFilter);
+  const asset = await prisma.asset.findFirst({
+    where: {
+      id: assetId,
+      ...baseFilter,
+    },
+  });
+
+  if (!asset?.imageUrl) {
+    return { success: true };
+  }
+
+  try {
+    const filePath = join(process.cwd(), "public", asset.imageUrl);
+    await unlink(filePath);
+  } catch (error) {
+    console.error("Failed to unlink image:", error);
+    // Continue anyway to clear it from DB
+  }
+
+  await prisma.asset.update({
+    where: { id: assetId },
+    data: { imageUrl: null },
+  });
+
+  return { success: true };
 }

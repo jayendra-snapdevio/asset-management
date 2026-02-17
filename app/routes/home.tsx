@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import { Button } from "~/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 
-export function meta({}: Route.MetaArgs) {
+export function meta({ }: Route.MetaArgs) {
   return [
     { title: "Asset Management System" },
     { name: "description", content: "Manage your company assets efficiently" },
@@ -33,7 +33,7 @@ export default function Home() {
             <Button asChild size="lg">
               <Link to="/login">Sign In</Link>
             </Button>
-            <Button asChild variant="outline" size="lg">
+            <Button asChild variant="ghost" size="lg">
               <Link to="/register">Create Account</Link>
             </Button>
           </div>

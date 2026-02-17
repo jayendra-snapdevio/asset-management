@@ -52,7 +52,8 @@ export async function action({ request }: Route.ActionArgs) {
     );
   }
 
-  const { email, password, firstName, lastName } = result.data;
+  const { email: rawEmail, password, firstName, lastName } = result.data;
+  const email = rawEmail.toLowerCase().trim();
 
   // Check if email already exists
   const existingUser = await prisma.user.findUnique({ where: { email } });
