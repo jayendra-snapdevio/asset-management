@@ -25,6 +25,7 @@ export const links: Route.LinksFunction = () => [
 ];
 
 import { useRouteLoaderData } from "react-router";
+import { TooltipProvider } from "~/components/ui/tooltip";
 
 export const loader = async ({ request }: Route.LoaderArgs) => {
   const theme = await getTheme(request);
@@ -58,7 +59,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
         )}
       </head>
       <body className="min-h-screen bg-background font-sans antialiased text-foreground">
-        {children}
+        <TooltipProvider>
+          {children}
+        </TooltipProvider>
         <ScrollRestoration />
         <Scripts />
       </body>

@@ -105,10 +105,29 @@ export async function getUserById(
               name: true,
               serialNumber: true,
               status: true,
+              category: true,
+              ownershipType: true,
+              owner: {
+                select: {
+                  firstName: true,
+                  lastName: true,
+                },
+              },
             },
           },
         },
         orderBy: { assignedDate: "desc" },
+      },
+      ownedAssets: {
+        select: {
+          id: true,
+          name: true,
+          serialNumber: true,
+          status: true,
+          category: true,
+          ownershipType: true,
+        },
+        orderBy: { createdAt: "desc" },
       },
     },
   });

@@ -34,8 +34,14 @@ export interface RecentActivity {
   status: string;
   assignedDate: Date;
   returnDate: Date | null;
-  asset: { id: string; name: string };
+  asset: { id: string; name: string; companyName?: string };
   user: { id: string; firstName: string; lastName: string };
+}
+
+export interface CompanyActivity {
+  companyId: string;
+  companyName: string;
+  activities: RecentActivity[];
 }
 
 /**
@@ -86,7 +92,7 @@ export async function getAdminDashboard(user: {
     prisma.asset.findMany({
       where: assetWhere,
       orderBy: { createdAt: "desc" },
-      take: 5,
+      take: 6,
       select: {
         id: true,
         name: true,
@@ -96,10 +102,13 @@ export async function getAdminDashboard(user: {
       },
     }),
 
-    // Recent activity (assignments) - get assignments and filter in JS
+    // Recent activity (assignments)
     prisma.assignment.findMany({
+      where: {
+        asset: assetWhere
+      },
       orderBy: { createdAt: "desc" },
-      take: 20, // Fetch more to account for filtering
+      take: 10,
       select: {
         id: true,
         status: true,
@@ -120,7 +129,13 @@ export async function getAdminDashboard(user: {
         }),
         prisma.asset.findMany({
           where: { id: { in: assetIds } },
-          select: { id: true, name: true },
+          select: { 
+            id: true, 
+            name: true,
+            company: {
+              select: { name: true }
+            }
+          },
         }),
       ]);
       
@@ -130,15 +145,21 @@ export async function getAdminDashboard(user: {
       // Filter and map assignments with valid relations
       return assignments
         .filter(a => userMap.has(a.userId) && assetMap.has(a.assetId))
-        .slice(0, 10)
-        .map(a => ({
-          id: a.id,
-          status: a.status,
-          assignedDate: a.assignedDate,
-          returnDate: a.returnDate,
-          user: userMap.get(a.userId)!,
-          asset: assetMap.get(a.assetId)!,
-        }));
+        .map(a => {
+          const asset = assetMap.get(a.assetId)!;
+          return {
+            id: a.id,
+            status: a.status,
+            assignedDate: a.assignedDate,
+            returnDate: a.returnDate,
+            user: userMap.get(a.userId)!,
+            asset: {
+              id: asset.id,
+              name: asset.name,
+              companyName: asset.company?.name
+            },
+          };
+        });
     }),
 
     // User count - handle companyId null case
@@ -192,7 +213,7 @@ export async function getAdminDashboard(user: {
  */
 export async function getUserDashboard(userId: string) {
   // Get assignments first, then filter by valid assets
-  const [allActiveAssignments, allHistory, totalAssigned, totalReturned] = await Promise.all([
+  const [allActiveAssignments, allHistory, totalAssigned, totalReturned, ownedAssets] = await Promise.all([
     prisma.assignment.findMany({
       where: { userId, status: "ACTIVE" },
       select: {
@@ -218,6 +239,17 @@ export async function getUserDashboard(userId: string) {
     }),
     prisma.assignment.count({ where: { userId } }),
     prisma.assignment.count({ where: { userId, status: "RETURNED" } }),
+    prisma.asset.findMany({
+      where: { ownerId: userId },
+      select: {
+        id: true,
+        name: true,
+        serialNumber: true,
+        category: true,
+        status: true,
+      },
+      orderBy: { createdAt: "desc" },
+    }),
   ]);
 
   // Get all unique asset IDs
@@ -264,8 +296,10 @@ export async function getUserDashboard(userId: string) {
   return {
     myAssets,
     history,
+    ownedAssets,
     stats: {
       currentAssets: myAssets.length,
+      ownedAssets: ownedAssets.length,
       totalAssigned,
       totalReturned,
     },

@@ -108,7 +108,7 @@ export async function action({ request }: Route.ActionArgs) {
 }
 
 export default function NewUserAssetPage({ loaderData, actionData }: Route.ComponentProps) {
-  const { userOptions } = loaderData;
+  const { user, userOptions } = loaderData;
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
   const [category, setCategory] = useState<string>("");
@@ -200,6 +200,7 @@ export default function NewUserAssetPage({ loaderData, actionData }: Route.Compo
                   <FormSelect
                     label="Select Owner (User)"
                     name="ownerId"
+                    defaultValue={user.id}
                     placeholder="Select user"
                     required
                     options={userOptions}

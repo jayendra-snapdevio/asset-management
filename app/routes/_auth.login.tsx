@@ -53,7 +53,8 @@ export async function action({ request }: Route.ActionArgs) {
     );
   }
 
-  const { email, password } = result.data;
+  const { email: rawEmail, password } = result.data;
+  const email = rawEmail.toLowerCase().trim();
 
   // Find user
   const user = await prisma.user.findUnique({ where: { email } });
@@ -132,7 +133,7 @@ export default function LoginPage({ actionData }: Route.ComponentProps) {
           />
 
           <PasswordToggleField name="password" label="Password" errors={errors?.password} />
-      
+
           <div className="flex justify-end">
             <Link
               to="/forgot-password"

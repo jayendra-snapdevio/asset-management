@@ -63,7 +63,7 @@ export function RecentAssetsTable({ assets }: RecentAssetsTableProps) {
   }
 
   return (
-    <Card >
+    <Card className="w-full">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Package className="h-5 w-5" />

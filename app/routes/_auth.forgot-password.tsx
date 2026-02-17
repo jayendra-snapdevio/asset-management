@@ -37,7 +37,7 @@ export async function action({ request }: Route.ActionArgs) {
 
   // Find user (don't reveal if email exists for security)
   const user = await prisma.user.findUnique({ where: { email } });
-  
+
   if (user) {
     // Generate reset token
     const resetToken = crypto.randomUUID();
@@ -97,7 +97,7 @@ export default function ForgotPasswordPage({ actionData }: Route.ComponentProps)
       </CardHeader>
       <Form method="post">
         <CardContent className="space-y-4">
-          <div className="space-y-2">
+          <div className="space-y-2 pb-4">
             <Label htmlFor="email">Email</Label>
             <Input
               id="email"

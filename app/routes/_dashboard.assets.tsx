@@ -1,8 +1,7 @@
+import { useState } from "react";
 import { data, Form, Link, useNavigation, useSearchParams } from "react-router";
 import type { Route } from "./+types/_dashboard.assets";
-import { requireRole } from "~/lib/session.server";
-import { getCompanyFilter } from "~/services/company.service.server";
-import { getAssets, deleteAsset } from "~/services/asset.service.server";
+// Server-only imports moved to loader/action to avoid Vite leakage
 import type { AssetStatus } from "@prisma/client";
 import { Card, CardContent } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
@@ -33,6 +32,7 @@ import {
 } from "~/components/ui/dialog";
 import { Badge } from "~/components/ui/badge";
 import { Pagination } from "~/components/shared/Pagination";
+import { Tooltip, TooltipTrigger, TooltipContent } from "~/components/ui/tooltip";
 import {
   Package,
   Plus,
@@ -53,6 +53,11 @@ export function meta() {
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
+  const { requireRole } = await import("../lib/session.server");
+  const { getCompanyFilter } = await import("../services/company.service.server");
+  const { getAssets } = await import("../services/asset.service.server");
+  const { getUsers } = await import("../services/user.service.server");
+
   const user = await requireRole(request, ["OWNER", "ADMIN", "USER"]);
   const companyFilter = await getCompanyFilter(user);
 
@@ -64,6 +69,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   const sortBy = url.searchParams.get("sortBy") || "createdAt";
   const sortOrder = (url.searchParams.get("sortOrder") || "desc") as "asc" | "desc";
   const limit = parseInt(url.searchParams.get("limit") || "10");
+  const ownerId = url.searchParams.get("ownerId") || undefined;
 
   const { assets, categories, pagination } = await getAssets(companyFilter, {
     page,
@@ -73,19 +79,36 @@ export async function loader({ request }: Route.LoaderArgs) {
     category,
     sortBy,
     sortOrder,
+    ownerId,
     userId: user.role === "USER" ? user.id : undefined,
   });
+
+  // Fetch potential owners for the filter (only for admins/owners)
+  let potentialOwners: any[] = [];
+  if (user.role === "ADMIN" || user.role === "OWNER") {
+    const { users } = await getUsers(user, {
+      page: 1,
+      limit: 100, // Reasonable limit for dropdown
+      isActive: true,
+    });
+    potentialOwners = users;
+  }
 
   return {
     user,
     assets,
     categories,
     pagination,
-    filters: { search, status, category, sortBy, sortOrder },
+    potentialOwners,
+    filters: { search, status, category, sortBy, sortOrder, ownerId },
   };
 }
 
 export async function action({ request }: Route.ActionArgs) {
+  const { requireRole } = await import("../lib/session.server");
+  const { getCompanyFilter } = await import("../services/company.service.server");
+  const { deleteAsset } = await import("../services/asset.service.server");
+
   const user = await requireRole(request, ["OWNER", "ADMIN"]);
   const companyFilter = await getCompanyFilter(user);
   const formData = await request.formData();
@@ -113,7 +136,7 @@ export async function action({ request }: Route.ActionArgs) {
 }
 
 export default function AssetsPage({ loaderData, actionData }: Route.ComponentProps) {
-  const { user, assets, categories, pagination, filters } = loaderData;
+  const { user, assets, categories, pagination, filters, potentialOwners } = loaderData;
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
   const [searchParams, setSearchParams] = useSearchParams();
@@ -175,7 +198,13 @@ export default function AssetsPage({ loaderData, actionData }: Route.ComponentPr
     );
   };
 
-  const hasFilters = filters.search || filters.status || filters.category;
+  const hasFilters = filters.search || filters.status || filters.category || filters.ownerId;
+
+  const [ownerSearch, setOwnerSearch] = useState("");
+
+  const filteredOwners = potentialOwners.filter((owner: any) =>
+    `${owner.firstName} ${owner.lastName}`.toLowerCase().includes(ownerSearch.toLowerCase())
+  );
 
   return (
     <div className="space-y-6">
@@ -189,7 +218,7 @@ export default function AssetsPage({ loaderData, actionData }: Route.ComponentPr
           {"message" in actionData ? actionData.message : "Action completed successfully"}
         </div>
       )}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold">Assets</h1>
           <p className="text-muted-foreground">
@@ -197,7 +226,7 @@ export default function AssetsPage({ loaderData, actionData }: Route.ComponentPr
           </p>
         </div>
         <Link to={canManageAssets ? "/dashboard/assets/new" : "/dashboard/user/assets/new"}>
-          <Button>
+          <Button className="w-full md:w-[180px]">
             <Plus className="h-4 w-4" />
             Add Asset
           </Button>
@@ -208,6 +237,7 @@ export default function AssetsPage({ loaderData, actionData }: Route.ComponentPr
       <Card>
         <CardContent className="pt-1">
           <div className="flex flex-wrap gap-4">
+            {/* Search Form */}
             <form onSubmit={handleSearch} className="flex gap-2 flex-1 min-w-[200px]">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -223,11 +253,12 @@ export default function AssetsPage({ loaderData, actionData }: Route.ComponentPr
               </Button>
             </form>
 
+            {/* Status Select */}
             <Select
               value={filters.status || "all"}
               onValueChange={(value) => handleFilterChange("status", value)}
             >
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="md:w-[180px] w-full">
                 <SelectValue placeholder="All Status" />
               </SelectTrigger>
               <SelectContent>
@@ -239,11 +270,12 @@ export default function AssetsPage({ loaderData, actionData }: Route.ComponentPr
               </SelectContent>
             </Select>
 
+            {/* Category Select */}
             <Select
               value={filters.category || "all"}
               onValueChange={(value) => handleFilterChange("category", value)}
             >
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="md:w-[180px] w-full">
                 <SelectValue placeholder="All Categories" />
               </SelectTrigger>
               <SelectContent>
@@ -263,8 +295,46 @@ export default function AssetsPage({ loaderData, actionData }: Route.ComponentPr
               </SelectContent>
             </Select>
 
+            {/* Owner Filter (Admin/Owner only) */}
+            {canManageAssets && potentialOwners.length > 0 && (
+              <Select
+                value={filters.ownerId || "all"}
+                onValueChange={(value) => handleFilterChange("ownerId", value)}
+              >
+                <SelectTrigger className="md:w-[180px] w-full">
+                  <SelectValue placeholder="All Owners" />
+                </SelectTrigger>
+                <SelectContent>
+                  <div className="px-2 py-2 sticky top-0 bg-popover z-10 border-b">
+                    <div className="relative">
+                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                      <Input
+                        placeholder="Search owners..."
+                        value={ownerSearch}
+                        onChange={(e) => setOwnerSearch(e.target.value)}
+                        className="h-8 pl-7 text-xs"
+                        onKeyDown={(e) => e.stopPropagation()}
+                      />
+                    </div>
+                  </div>
+                  <SelectItem value="all">All Owners</SelectItem>
+                  {filteredOwners.length === 0 ? (
+                    <p className="p-2 text-xs text-center text-muted-foreground">
+                      No owners found
+                    </p>
+                  ) : (
+                    filteredOwners.map((owner: any) => (
+                      <SelectItem key={owner.id} value={owner.id}>
+                        {owner.firstName} {owner.lastName}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            )}
+
             {hasFilters && (
-              <Button variant="ghost" size="sm" onClick={clearFilters}>
+              <Button variant="ghost" size="sm" className="md:w-[180px] w-full" onClick={clearFilters}>
                 <X className="h-4 w-4 mr-1" />
                 Clear Filters
               </Button>
@@ -296,7 +366,7 @@ export default function AssetsPage({ loaderData, actionData }: Route.ComponentPr
         </Card>
       ) : (
         <Card>
-          <CardContent className="p-0">
+          <CardContent className="px-4">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -356,21 +426,26 @@ export default function AssetsPage({ loaderData, actionData }: Route.ComponentPr
                       <TableCell>
                         <div className="flex flex-col gap-1 text-xs">
                           {asset.ownershipType ? (
-                            <Badge variant="secondary" className="bg-slate-100 text-slate-800 w-fit">
-                              {OWNERSHIP_TYPE_LABELS[asset.ownershipType as keyof typeof OWNERSHIP_TYPE_LABELS] || asset.ownershipType}
-                            </Badge>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge variant="secondary" className="bg-slate-100 text-slate-800 w-fit cursor-help">
+                                  {OWNERSHIP_TYPE_LABELS[asset.ownershipType as keyof typeof OWNERSHIP_TYPE_LABELS] || asset.ownershipType}
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {asset.ownershipType === "PRIVATE" && asset.owner && (
+                                  <span>Owner: {asset.owner.firstName} {asset.owner.lastName}</span>
+                                )}
+                                {asset.ownershipType === "OTHER" && asset.otherOwnership && (
+                                  <span>Details: {asset.otherOwnership}</span>
+                                )}
+                                {asset.ownershipType === "COMPANY" && (
+                                  <span>Company Owned Asset</span>
+                                )}
+                              </TooltipContent>
+                            </Tooltip>
                           ) : (
                             <span className="text-muted-foreground">—</span>
-                          )}
-                          {asset.ownershipType === "PRIVATE" && asset.owner && (
-                            <span className="text-muted-foreground">
-                              {asset.owner.firstName} {asset.owner.lastName}
-                            </span>
-                          )}
-                          {asset.ownershipType === "OTHER" && asset.otherOwnership && (
-                            <span className="text-muted-foreground truncate max-w-[120px]" title={asset.otherOwnership}>
-                              {asset.otherOwnership}
-                            </span>
                           )}
                         </div>
                       </TableCell>

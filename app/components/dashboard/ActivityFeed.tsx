@@ -16,15 +16,16 @@ interface ActivityItem {
   status: string;
   assignedDate: Date;
   returnDate: Date | null;
-  asset: { id: string; name: string };
+  asset: { id: string; name: string; companyName?: string };
   user: { id: string; firstName: string; lastName: string };
 }
 
 interface ActivityFeedProps {
   activities: ActivityItem[];
+  noCard?: boolean;
 }
 
-export function ActivityFeed({ activities }: ActivityFeedProps) {
+export function ActivityFeed({ activities, noCard = false }: ActivityFeedProps) {
   const getActivityIcon = (status: string) => {
     switch (status) {
       case "ACTIVE":
@@ -41,6 +42,11 @@ export function ActivityFeed({ activities }: ActivityFeedProps) {
   const getActivityMessage = (activity: ActivityItem) => {
     const userName = `${activity.user.firstName} ${activity.user.lastName}`;
     const assetName = activity.asset.name;
+    const companyTag = activity.asset.companyName ? (
+      <span className="text-xs text-muted-foreground ml-1">
+        ({activity.asset.companyName})
+      </span>
+    ) : null;
 
     switch (activity.status) {
       case "ACTIVE":
@@ -53,6 +59,7 @@ export function ActivityFeed({ activities }: ActivityFeedProps) {
             >
               {assetName}
             </Link>
+            {companyTag}
           </>
         );
       case "RETURNED":
@@ -65,6 +72,7 @@ export function ActivityFeed({ activities }: ActivityFeedProps) {
             >
               {assetName}
             </Link>
+            {companyTag}
           </>
         );
       case "TRANSFERRED":
@@ -76,7 +84,7 @@ export function ActivityFeed({ activities }: ActivityFeedProps) {
             >
               {assetName}
             </Link>{" "}
-            was transferred to <span className="font-medium">{userName}</span>
+            {companyTag} was transferred to <span className="font-medium">{userName}</span>
           </>
         );
       default:
@@ -89,6 +97,7 @@ export function ActivityFeed({ activities }: ActivityFeedProps) {
             >
               {assetName}
             </Link>
+            {companyTag}
           </>
         );
     }
@@ -107,33 +116,11 @@ export function ActivityFeed({ activities }: ActivityFeedProps) {
     }
   };
 
-  if (activities.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Activity className="h-5 w-5" />
-            Recent Activity
-          </CardTitle>
-          <CardDescription>Latest asset assignments</CardDescription>
-        </CardHeader>
-        <CardContent className="flex items-center justify-center py-8">
-          <p className="text-muted-foreground">No recent activity</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Activity className="h-5 w-5" />
-          Recent Activity
-        </CardTitle>
-        <CardDescription>Latest asset assignments</CardDescription>
-      </CardHeader>
-      <CardContent>
+  const content = (
+    <div className="space-y-4">
+      {activities.length === 0 ? (
+        <p className="text-muted-foreground text-center py-8">No recent activity</p>
+      ) : (
         <ScrollArea className="h-[300px] pr-4">
           <div className="space-y-4">
             {activities.map((activity) => (
@@ -155,7 +142,24 @@ export function ActivityFeed({ activities }: ActivityFeedProps) {
             ))}
           </div>
         </ScrollArea>
-      </CardContent>
+      )}
+    </div>
+  );
+
+  if (noCard) {
+    return content;
+  }
+
+  return (
+    <Card className="w-full">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Activity className="h-5 w-5" />
+          Recent Activity
+        </CardTitle>
+        <CardDescription>Latest asset assignments</CardDescription>
+      </CardHeader>
+      <CardContent>{content}</CardContent>
     </Card>
   );
 }

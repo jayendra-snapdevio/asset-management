@@ -133,9 +133,9 @@ export default function CompanyDetailPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <Button asChild variant="ghost" size="sm">
+          <Button asChild variant="default" size="sm">
             <Link to="/dashboard/companies">
               <ArrowLeft className="h-4 w-4 mr-1" />
             </Link>
@@ -320,9 +320,15 @@ export default function CompanyDetailPage({
                 {typedCompany.users.map((user) => (
                   <TableRow key={user.id}>
                     <TableCell className="font-medium">
-                      {user.firstName} {user.lastName}
+                      <Link to={`/dashboard/users/${user.id}`} className="hover:underline text-primary">
+                        {user.firstName} {user.lastName}
+                      </Link>
                     </TableCell>
-                    <TableCell>{user.email}</TableCell>
+                    <TableCell>
+                      <Link to={`/dashboard/users/${user.id}`} className="hover:underline text-primary">
+                        {user.email}
+                      </Link>
+                    </TableCell>
                     <TableCell>{getRoleBadge(user.role)}</TableCell>
                     <TableCell>
                       {formatDate(user.createdAt)}

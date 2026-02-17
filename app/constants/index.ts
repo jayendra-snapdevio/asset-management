@@ -97,7 +97,7 @@ export interface NavItem {
 
 export const DASHBOARD_NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: "LayoutDashboard" },
-  { label: "Assets", href: "/dashboard/assets", icon: "Package", roles: ["OWNER", "ADMIN"] },
+  { label: "Assets", href: "/dashboard/assets", icon: "Package", roles: ["OWNER", "ADMIN", "USER"] },
   { label: "Users", href: "/dashboard/users", icon: "Users", roles: ["OWNER", "ADMIN"] },
   { label: "Companies", href: "/dashboard/companies", icon: "Building2", roles: ["OWNER"] },
   { label: "Assignments", href: "/dashboard/assignments", icon: "ClipboardList", roles: ["OWNER", "ADMIN"] },

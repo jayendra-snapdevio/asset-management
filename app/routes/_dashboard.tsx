@@ -1,6 +1,5 @@
 import { Outlet, isRouteErrorResponse } from "react-router";
 import type { Route } from "./+types/_dashboard";
-import { requireAuth } from "~/lib/session.server";
 import { Sidebar } from "~/components/layout/Sidebar";
 import { Header } from "~/components/layout/Header";
 import { Button } from "~/components/ui/button";
@@ -8,6 +7,7 @@ import { Link } from "react-router";
 
 export async function loader({ request }: Route.LoaderArgs) {
   // This runs on every dashboard route navigation
+  const { requireAuth } = await import("../lib/session.server");
   const user = await requireAuth(request); // Redirects to /login if not authenticated
   return { user };
 }
@@ -16,11 +16,11 @@ export default function DashboardLayout({ loaderData }: Route.ComponentProps) {
   const { user } = loaderData;
   
   return (
-    <div className="flex h-screen bg-background">
+    <div className="md:flex md:h-screen bg-background">
       <Sidebar user={user} />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header user={user} />
-        <main className="flex-1 overflow-auto p-6">
+        <main className="flex-1 overflow-auto p-4 md:p-6">
           <Outlet context={{ user }} />
         </main>
       </div>

@@ -57,6 +57,8 @@ import {
 import { formatDate } from "~/lib/date";
 import { SuccessMessage } from "~/components/ui/success-message";
 import type { UserDetail } from "~/types";
+import { OWNERSHIP_TYPE_LABELS } from "~/constants";
+import { Tooltip, TooltipContent, TooltipTrigger } from "~/components/ui/tooltip";
 
 export function meta({ data }: Route.MetaArgs) {
   const userName = data?.user
@@ -237,21 +239,27 @@ export default function UserDetailPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <Button asChild variant="ghost" size="sm">
+          <Button asChild variant="default" size="sm">
             <Link to="/dashboard/users">
               <ArrowLeft className="h-4 w-4 mr-1" />
             </Link>
           </Button>
-          <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2">
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-row text-3xl font-bold flex items-center gap-2">
               <User className="h-8 w-8" />
-              {typedUser.firstName} {typedUser.lastName}
-            </h1>
-            <p className="text-muted-foreground flex items-center gap-2">
-              {typedUser.email}
-              {getRoleBadge(typedUser.role)}
+              <h1> {typedUser.firstName} {typedUser.lastName}</h1>
+            </div>
+            <div className="text-muted-foreground flex items-center gap-2">
+             <Tooltip>
+               <TooltipTrigger asChild>
+                 <button> {getRoleBadge(typedUser.role)}</button>
+               </TooltipTrigger>
+               <TooltipContent>
+                 {typedUser.email}
+               </TooltipContent>
+            </Tooltip>
               {typedUser.isActive ? (
                 <Badge
                   variant="outline"
@@ -269,11 +277,11 @@ export default function UserDetailPage({
                   Inactive
                 </Badge>
               )}
-            </p>
+            </div>
           </div>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex gap-4 flex-col md:flex-row md:flex-nowrap">
           {canModify && !isSelf && (
             <>
               <Dialog
@@ -281,7 +289,7 @@ export default function UserDetailPage({
                 onOpenChange={setIsResetPasswordOpen}
               >
                 <DialogTrigger asChild>
-                  <Button variant="outline">
+                  <Button variant="outline" className="w-full md:w-[180px]">
                     <KeyRound className="h-4 w-4 mr-2" />
                     Reset Password
                   </Button>
@@ -311,10 +319,9 @@ export default function UserDetailPage({
                     </div>
                     <DialogFooter>
                       <Button
-                        type="button"
+                        className="w-full md:w-[180px]"
                         variant="outline"
-                        onClick={() => setIsResetPasswordOpen(false)}
-                      >
+                        onClick={() => setIsResetPasswordOpen(false)}>
                         Cancel
                       </Button>
                       <Button type="submit" disabled={isSubmitting}>
@@ -325,10 +332,11 @@ export default function UserDetailPage({
                 </DialogContent>
               </Dialog>
 
-              <Form method="post">
+              <Form method="post" className="w-full">
                 <input type="hidden" name="intent" value="toggle-status" />
                 <Button
                   type="submit"
+                  className="w-full md:w-[180px]"
                   variant={typedUser.isActive ? "destructive" : "default"}
                   disabled={isSubmitting}
                 >
@@ -348,7 +356,7 @@ export default function UserDetailPage({
 
               <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button variant="destructive">
+                  <Button variant="destructive" className="w-full md:w-[180px]">
                     <UserX className="h-4 w-4 mr-2" />
                     Delete User
                   </Button>
@@ -381,6 +389,7 @@ export default function UserDetailPage({
             </>
           )}
         </div>
+
       </div>
 
       {actionData && "success" in actionData && actionData.success && (
@@ -399,7 +408,7 @@ export default function UserDetailPage({
       )}
 
       {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
@@ -421,6 +430,17 @@ export default function UserDetailPage({
           <CardContent>
             <div className="text-2xl font-bold">
               {typedUser.assignments.length}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Owned Assets</CardTitle>
+            <Shield className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {typedUser.ownedAssets.length}
             </div>
           </CardContent>
         </Card>
@@ -508,7 +528,7 @@ export default function UserDetailPage({
         </CardContent>
       </Card>
 
-      {/* Active Assignments */}
+      {/* Active Assets */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -522,17 +542,18 @@ export default function UserDetailPage({
         <CardContent>
           {activeAssignments.length === 0 ? (
             <p className="text-muted-foreground text-center py-8">
-              No active assignments
+              No active assets
             </p>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Asset</TableHead>
+                  <TableHead>Name</TableHead>
                   <TableHead>Serial Number</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead>Ownership</TableHead>
                   <TableHead>Assigned Date</TableHead>
                   <TableHead>Duration</TableHead>
-                  <TableHead>Notes</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -549,12 +570,84 @@ export default function UserDetailPage({
                     <TableCell>
                       {assignment.asset.serialNumber || "-"}
                     </TableCell>
+                    <TableCell className="capitalize">
+                      {assignment.asset.category || "-"}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col gap-1">
+                        {assignment.asset.ownershipType ? (
+                          <Badge variant="outline" className="w-fit">
+                            {OWNERSHIP_TYPE_LABELS[assignment.asset.ownershipType as keyof typeof OWNERSHIP_TYPE_LABELS] || assignment.asset.ownershipType}
+                          </Badge>
+                        ) : "-"}
+                        {assignment.asset.ownershipType === "PRIVATE" && assignment.asset.owner && (
+                          <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                            Owner: {assignment.asset.owner.firstName} {assignment.asset.owner.lastName}
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell>{formatDate(assignment.assignedDate)}</TableCell>
                     <TableCell className="text-muted-foreground">
                       {formatDuration(assignment.assignedDate, new Date())}{" "}
                       (ongoing)
                     </TableCell>
-                    <TableCell>{assignment.notes || "-"}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Owned Assets */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5" />
+            Owned Assets ({typedUser.ownedAssets.length})
+          </CardTitle>
+          <CardDescription>
+            Assets where this user is the registered owner
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {typedUser.ownedAssets.length === 0 ? (
+            <p className="text-muted-foreground text-center py-8">
+              No owned assets
+            </p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Serial Number</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {typedUser.ownedAssets.map((asset) => (
+                  <TableRow key={asset.id}>
+                    <TableCell className="font-medium">
+                      <Link
+                        to={`/dashboard/assets/${asset.id}`}
+                        className="hover:underline text-primary"
+                      >
+                        {asset.name}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      {asset.serialNumber || "-"}
+                    </TableCell>
+                    <TableCell className="capitalize">
+                      {asset.category || "-"}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">
+                        {asset.status}
+                      </Badge>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -579,6 +672,8 @@ export default function UserDetailPage({
                 <TableRow>
                   <TableHead>Asset</TableHead>
                   <TableHead>Serial Number</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead>Ownership</TableHead>
                   <TableHead>Assigned</TableHead>
                   <TableHead>Returned</TableHead>
                   <TableHead>Duration</TableHead>
@@ -588,13 +683,30 @@ export default function UserDetailPage({
               <TableBody>
                 {pastAssignments.map((assignment) => (
                   <TableRow key={assignment.id}>
-                    <Link to={`/dashboard/assets/${assignment.asset.id}`} className="hover:underline">
-                      <TableCell className="font-medium">
+                    <TableCell className="font-medium">
+                      <Link to={`/dashboard/assets/${assignment.asset.id}`} className="hover:underline text-primary">
                         {assignment.asset.name}
-                      </TableCell>
-                    </Link>
+                      </Link>
+                    </TableCell>
                     <TableCell>
                       {assignment.asset.serialNumber || "-"}
+                    </TableCell>
+                    <TableCell className="capitalize">
+                      {assignment.asset.category || "-"}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col gap-1">
+                        {assignment.asset.ownershipType ? (
+                          <Badge variant="outline" className="w-fit">
+                            {OWNERSHIP_TYPE_LABELS[assignment.asset.ownershipType as keyof typeof OWNERSHIP_TYPE_LABELS] || assignment.asset.ownershipType}
+                          </Badge>  
+                        ) : "-"}
+                        {assignment.asset.ownershipType === "PRIVATE" && assignment.asset.owner && (
+                          <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                            Owner: {assignment.asset.owner.firstName} {assignment.asset.owner.lastName}
+                          </span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>{formatDate(assignment.assignedDate)}</TableCell>
                     <TableCell>

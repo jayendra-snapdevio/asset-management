@@ -30,7 +30,9 @@ export interface UserAssignment {
     id: string;
     name: string;
     serialNumber: string | null;
-    status: AssetStatus;
+    category: string | null;
+    ownershipType: string | null;
+    owner: { firstName: string; lastName: string } | null;
   };
 }
 
@@ -45,4 +47,12 @@ export interface UserDetail {
   companyId: string | null;
   company: { id: string; name: string } | null;
   assignments: UserAssignment[];
+  ownedAssets: {
+    id: string;
+    name: string;
+    serialNumber: string | null;
+    status: AssetStatus;
+    category: string | null;
+    ownershipType: string | null;
+  }[];
 }

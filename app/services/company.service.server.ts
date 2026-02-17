@@ -288,12 +288,11 @@ export async function removeAdminFromCompany(
     return { error: "User not found in this company" };
   }
 
-  // Remove user from company and demote to USER
+  // Demote to USER but keep in the same company
   const updatedUser = await prisma.user.update({
     where: { id: userId },
     data: {
       role: "USER",
-      companyId: null,
     },
   });
 
