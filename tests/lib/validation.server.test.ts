@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { validateFormData, validateData, flattenZodErrors } from "~/lib/validation.server";
+import {
+  validateFormData,
+  validateData,
+  flattenZodErrors,
+} from "~/lib/validation.server";
 import { z } from "zod";
 
 describe("validateFormData", () => {

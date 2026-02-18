@@ -12,6 +12,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Settings,
+  Clock,
 } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { ScrollArea } from "~/components/ui/scroll-area";
@@ -59,6 +60,12 @@ const navItems: NavItem[] = [
     roles: ["OWNER", "ADMIN", "USER"],
   },
   {
+    label: "Requests",
+    href: "/dashboard/requests",
+    icon: <Clock className="h-5 w-5" />,
+    roles: ["OWNER", "ADMIN"],
+  },
+  {
     label: "My Assets",
     href: "/dashboard/my-assets",
     icon: <Laptop className="h-5 w-5" />,
@@ -76,12 +83,12 @@ const navItems: NavItem[] = [
   },
 ];
 
-export function SidebarContent({ 
-  user, 
-  collapsed = false, 
-  onNavItemClick 
-}: { 
-  user: User; 
+export function SidebarContent({
+  user,
+  collapsed = false,
+  onNavItemClick,
+}: {
+  user: User;
   collapsed?: boolean;
   onNavItemClick?: () => void;
 }) {
@@ -109,7 +116,7 @@ export function SidebarContent({
               isActive
                 ? "bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:bg-muted hover:text-foreground",
-              collapsed && "justify-center"
+              collapsed && "justify-center",
             )}
             title={collapsed ? item.label : undefined}
           >
@@ -129,7 +136,7 @@ export function Sidebar({ user }: SidebarProps) {
     <aside
       className={cn(
         "hidden md:flex flex-col border-r bg-card transition-all duration-300",
-        collapsed ? "w-16" : "w-64"
+        collapsed ? "w-16" : "w-64",
       )}
     >
       {/* Logo */}

@@ -29,7 +29,14 @@ import {
 } from "~/components/ui/table";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
-import { Package, ArrowRight, Building2, Shield, UserCheck, CheckCircle } from "lucide-react";
+import {
+  Package,
+  ArrowRight,
+  Building2,
+  Shield,
+  UserCheck,
+  CheckCircle,
+} from "lucide-react";
 
 export function meta() {
   return [
@@ -67,7 +74,9 @@ export function HydrateFallback() {
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   return (
     <div className="p-6 border border-red-300 rounded-lg bg-red-50">
-      <h2 className="text-red-700 font-bold text-lg">Failed to load dashboard</h2>
+      <h2 className="text-red-700 font-bold text-lg">
+        Failed to load dashboard
+      </h2>
       <p className="text-red-600 mt-2">
         {error instanceof Error ? error.message : "An unknown error occurred"}
       </p>
@@ -127,9 +136,7 @@ export default function DashboardIndex({ loaderData }: Route.ComponentProps) {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold">
-            Welcome, {user.firstName}!
-          </h1>
+          <h1 className="text-3xl font-bold">Welcome, {user.firstName}!</h1>
           <p className="text-muted-foreground">
             Here's an overview of your assigned assets
           </p>
@@ -191,7 +198,10 @@ export default function DashboardIndex({ loaderData }: Route.ComponentProps) {
                   {myAssets.map((assignment) => (
                     <TableRow key={assignment.id}>
                       <TableCell className="font-medium">
-                        <Link className="hover:underline" to={`/dashboard/assets/${assignment.asset.id}`}>
+                        <Link
+                          className="hover:underline"
+                          to={`/dashboard/assets/${assignment.asset.id}`}
+                        >
                           {assignment.asset.name}
                         </Link>
                       </TableCell>
@@ -217,7 +227,9 @@ export default function DashboardIndex({ loaderData }: Route.ComponentProps) {
               <Shield className="h-5 w-5" />
               My Owned Assets
             </CardTitle>
-            <CardDescription>Assets where you are the registered owner</CardDescription>
+            <CardDescription>
+              Assets where you are the registered owner
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {ownedAssets.length === 0 ? (
@@ -238,18 +250,17 @@ export default function DashboardIndex({ loaderData }: Route.ComponentProps) {
                   {ownedAssets.map((asset) => (
                     <TableRow key={asset.id}>
                       <TableCell className="font-medium">
-                        <Link className="hover:underline" to={`/dashboard/assets/${asset.id}`}>
+                        <Link
+                          className="hover:underline"
+                          to={`/dashboard/assets/${asset.id}`}
+                        >
                           {asset.name}
                         </Link>
                       </TableCell>
-                      <TableCell>
-                        {asset.serialNumber || "-"}
-                      </TableCell>
+                      <TableCell>{asset.serialNumber || "-"}</TableCell>
                       <TableCell>{asset.category || "-"}</TableCell>
                       <TableCell>
-                        <Badge variant="secondary">
-                          {asset.status}
-                        </Badge>
+                        <Badge variant="secondary">{asset.status}</Badge>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -280,17 +291,16 @@ export default function DashboardIndex({ loaderData }: Route.ComponentProps) {
                   {history.map((item) => (
                     <TableRow key={item.id}>
                       <TableCell className="font-medium">
-                        <Link className="hover:underline" to={`/dashboard/assets/${item.asset.id}`}>
+                        <Link
+                          className="hover:underline"
+                          to={`/dashboard/assets/${item.asset.id}`}
+                        >
                           {item.asset.name}
                         </Link>
                       </TableCell>
+                      <TableCell>{formatDate(item.assignedDate)}</TableCell>
                       <TableCell>
-                        {formatDate(item.assignedDate)}
-                      </TableCell>
-                      <TableCell>
-                        {item.returnDate
-                          ? formatDate(item.returnDate)
-                          : "-"}
+                        {item.returnDate ? formatDate(item.returnDate) : "-"}
                       </TableCell>
                       <TableCell>
                         <Badge
@@ -313,49 +323,56 @@ export default function DashboardIndex({ loaderData }: Route.ComponentProps) {
   }
 
   // Admin/Owner Dashboard
-  const { stats, statusDistribution, categoryDistribution, recentAssets, recentActivity } =
-    loaderData as {
-      stats: {
-        totalAssets: number;
-        assignedAssets: number;
-        availableAssets: number;
-        underMaintenance: number;
-        retiredAssets: number;
-        totalUsers: number;
-      };
-      statusDistribution: Array<{
-        status: string;
-        count: number;
-        percentage: number;
-      }>;
-      categoryDistribution: Array<{
-        category: string | null;
-        count: number;
-      }>;
-      recentAssets: Array<{
-        id: string;
-        name: string;
-        category: string | null;
-        status: string;
-        createdAt: Date;
-      }>;
-      recentActivity: Array<{
-        id: string;
-        status: string;
-        assignedDate: Date;
-        returnDate: Date | null;
-        asset: { id: string; name: string; companyName?: string };
-        user: { id: string; firstName: string; lastName: string };
-      }>;
-      user: { firstName: string; lastName: string; role: string };
-      isUserDashboard: boolean;
+  const {
+    stats,
+    statusDistribution,
+    categoryDistribution,
+    recentAssets,
+    recentActivity,
+  } = loaderData as {
+    stats: {
+      totalAssets: number;
+      assignedAssets: number;
+      availableAssets: number;
+      underMaintenance: number;
+      retiredAssets: number;
+      totalUsers: number;
     };
+    statusDistribution: Array<{
+      status: string;
+      count: number;
+      percentage: number;
+    }>;
+    categoryDistribution: Array<{
+      category: string | null;
+      count: number;
+    }>;
+    recentAssets: Array<{
+      id: string;
+      name: string;
+      category: string | null;
+      status: string;
+      createdAt: Date;
+    }>;
+    recentActivity: Array<{
+      id: string;
+      status: string;
+      assignedDate: Date;
+      returnDate: Date | null;
+      asset: { id: string; name: string; companyName?: string };
+      user: { id: string; firstName: string; lastName: string };
+    }>;
+    user: { firstName: string; lastName: string; role: string };
+    isUserDashboard: boolean;
+  };
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold">
-            {(user as any).company?.name ? `${(user as any).company.name} Dashboard` : "Dashboard"}
+            {(user as any).company?.name
+              ? `${(user as any).company.name} Dashboard`
+              : "Dashboard"}
           </h1>
           <p className="text-muted-foreground">
             Welcome back, {user.firstName}! Here's your asset overview.

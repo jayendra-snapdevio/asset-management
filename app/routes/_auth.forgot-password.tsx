@@ -5,7 +5,14 @@ import { forgotPasswordSchema } from "~/validators/auth.validator";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "~/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
 
 export function meta() {
   return [
@@ -29,7 +36,7 @@ export async function action({ request }: Route.ActionArgs) {
   if (!result.success) {
     return data<ActionResponse>(
       { errors: result.error.flatten().fieldErrors },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -52,17 +59,22 @@ export async function action({ request }: Route.ActionArgs) {
     // For development, log the token
     console.log(`Password reset requested for ${email}`);
     console.log(`Reset token: ${resetToken}`);
-    console.log(`Reset link: ${process.env.APP_URL}/reset-password?token=${resetToken}`);
+    console.log(
+      `Reset link: ${process.env.APP_URL}/reset-password?token=${resetToken}`,
+    );
   }
 
   // Always return success to prevent email enumeration
   return data<ActionResponse>({
     success: true,
-    message: "If an account exists with this email, you will receive a password reset link.",
+    message:
+      "If an account exists with this email, you will receive a password reset link.",
   });
 }
 
-export default function ForgotPasswordPage({ actionData }: Route.ComponentProps) {
+export default function ForgotPasswordPage({
+  actionData,
+}: Route.ComponentProps) {
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
   const success = actionData?.success as boolean | undefined;

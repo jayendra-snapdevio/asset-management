@@ -50,7 +50,10 @@ export function FormSelect({
   return (
     <div className={cn("space-y-2", containerClassName)}>
       {label && (
-        <Label htmlFor={fieldId} className={cn(errorText && "text-destructive")}>
+        <Label
+          htmlFor={fieldId}
+          className={cn(errorText && "text-destructive")}
+        >
           {label} {required && <span className="text-destructive">*</span>}
         </Label>
       )}
@@ -66,14 +69,18 @@ export function FormSelect({
           id={fieldId}
           className={cn(
             errorText && "border-destructive focus:ring-destructive",
-            "w-full"
+            "w-full",
           )}
         >
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
           {options.map((option) => (
-            <SelectItem key={option.value} value={option.value} disabled={option.disabled}>
+            <SelectItem
+              key={option.value}
+              value={option.value}
+              disabled={option.disabled}
+            >
               {option.label}
             </SelectItem>
           ))}
@@ -84,11 +91,7 @@ export function FormSelect({
           {helperText}
         </p>
       )}
-      {errorText && (
-        <p className="text-sm text-destructive">
-          {errorText}
-        </p>
-      )}
+      {errorText && <p className="text-sm text-destructive">{errorText}</p>}
     </div>
   );
 }

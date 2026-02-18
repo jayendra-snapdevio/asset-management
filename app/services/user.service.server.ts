@@ -23,7 +23,7 @@ export interface PaginationResult {
  */
 export async function getUsers(
   currentUser: { id: string; role: string; companyId: string | null },
-  { page, limit, search, role, isActive }: UserPaginationParams
+  { page, limit, search, role, isActive }: UserPaginationParams,
 ) {
   const companyFilter = await getCompanyFilter(currentUser);
 
@@ -84,7 +84,7 @@ export async function getUsers(
  */
 export async function getUserById(
   userId: string,
-  currentUser: { id: string; role: string; companyId: string | null }
+  currentUser: { id: string; role: string; companyId: string | null },
 ) {
   const companyFilter = await getCompanyFilter(currentUser);
 
@@ -144,7 +144,7 @@ export async function createUser(
     lastName: string;
     role?: Role;
   },
-  currentUser: { id: string; role: string; companyId: string | null }
+  currentUser: { id: string; role: string; companyId: string | null },
 ) {
   // Check if email already exists
   const existing = await prisma.user.findUnique({
@@ -188,7 +188,7 @@ export async function updateUser(
     firstName?: string;
     lastName?: string;
     role?: Role;
-  }
+  },
 ) {
   const companyFilter = await getCompanyFilter(currentUser);
 
@@ -237,7 +237,10 @@ export async function updateUser(
 
 // delete users
 
-export async function deleteUser(userId: string, currentUser: { id: string; role: string; companyId: string | null }) {
+export async function deleteUser(
+  userId: string,
+  currentUser: { id: string; role: string; companyId: string | null },
+) {
   const companyFilter = await getCompanyFilter(currentUser);
 
   // Verify access
@@ -271,7 +274,7 @@ export async function deleteUser(userId: string, currentUser: { id: string; role
  */
 export async function toggleUserStatus(
   userId: string,
-  currentUser: { id: string; role: string; companyId: string | null }
+  currentUser: { id: string; role: string; companyId: string | null },
 ) {
   const companyFilter = await getCompanyFilter(currentUser);
 
@@ -311,7 +314,7 @@ export async function toggleUserStatus(
 export async function resetUserPassword(
   userId: string,
   newPassword: string,
-  currentUser: { id: string; role: string; companyId: string | null }
+  currentUser: { id: string; role: string; companyId: string | null },
 ) {
   const companyFilter = await getCompanyFilter(currentUser);
 
@@ -365,7 +368,7 @@ export async function getAvailableCompanies(ownerId: string) {
 export async function assignUserToCompany(
   userId: string,
   companyId: string | null,
-  ownerId: string
+  ownerId: string,
 ) {
   // If assigning to a company, verify ownership
   if (companyId) {

@@ -17,11 +17,11 @@ const themeCookie = createCookie("__theme", {
 export async function getTheme(request: Request): Promise<Theme> {
   const cookieHeader = request.headers.get("Cookie");
   const theme = await themeCookie.parse(cookieHeader);
-  
+
   if (theme === "light" || theme === "dark" || theme === "system") {
     return theme;
   }
-  
+
   return "system";
 }
 

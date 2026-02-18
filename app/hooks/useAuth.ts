@@ -20,7 +20,9 @@ interface DashboardLoaderData {
  */
 export function useAuth() {
   // Get user from dashboard layout loader
-  const data = useRouteLoaderData("routes/_dashboard") as DashboardLoaderData | undefined;
+  const data = useRouteLoaderData("routes/_dashboard") as
+    | DashboardLoaderData
+    | undefined;
   const user = data?.user ?? null;
 
   return {

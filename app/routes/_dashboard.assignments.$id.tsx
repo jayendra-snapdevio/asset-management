@@ -60,7 +60,9 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   // Restrict access for USER role
   if (user.role === "USER" && assignment.userId !== user.id) {
-    throw new Response("You do not have permission to view this assignment", { status: 403 });
+    throw new Response("You do not have permission to view this assignment", {
+      status: 403,
+    });
   }
 
   // Get users for transfer (admin/owner only)
@@ -77,7 +79,11 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     transferUsers = transferUsers.filter((u) => u.id !== assignment.userId);
   }
 
-  return { user, assignment: assignment as AssignmentWithRelations, transferUsers };
+  return {
+    user,
+    assignment: assignment as AssignmentWithRelations,
+    transferUsers,
+  };
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
@@ -99,7 +105,7 @@ export async function action({ request, params }: Route.ActionArgs) {
       const result = await returnAssignment(
         params.id!,
         notes || undefined,
-        user.role === "USER" ? user.id : undefined
+        user.role === "USER" ? user.id : undefined,
       );
 
       if (result.error) {
@@ -126,7 +132,11 @@ export async function action({ request, params }: Route.ActionArgs) {
     }
 
     try {
-      const result = await transferAssignment(params.id!, newUserId, notes || undefined);
+      const result = await transferAssignment(
+        params.id!,
+        newUserId,
+        notes || undefined,
+      );
 
       if (result.error) {
         return errorResponse(result.error);
@@ -148,7 +158,9 @@ function getStatusBadge(status: AssignmentStatus) {
     case "RETURNED":
       return <Badge variant="secondary">Returned</Badge>;
     case "TRANSFERRED":
-      return <Badge className="bg-blue-500 hover:bg-blue-600">Transferred</Badge>;
+      return (
+        <Badge className="bg-blue-500 hover:bg-blue-600">Transferred</Badge>
+      );
     default:
       return <Badge variant="outline">{status}</Badge>;
   }
@@ -356,7 +368,9 @@ export default function AssignmentDetailPage({
             {typedAssignment.notes && (
               <div className="pt-4 border-t">
                 <span className="text-muted-foreground text-sm">Notes</span>
-                <p className="mt-1 whitespace-pre-wrap">{typedAssignment.notes}</p>
+                <p className="mt-1 whitespace-pre-wrap">
+                  {typedAssignment.notes}
+                </p>
               </div>
             )}
           </CardContent>
@@ -373,14 +387,18 @@ export default function AssignmentDetailPage({
           <CardContent className="space-y-4">
             <div>
               <span className="text-muted-foreground text-sm">Name</span>
-              <p className="font-medium text-lg">{typedAssignment.asset.name}</p>
+              <p className="font-medium text-lg">
+                {typedAssignment.asset.name}
+              </p>
             </div>
             {typedAssignment.asset.serialNumber && (
               <div>
                 <span className="text-muted-foreground text-sm">
                   Serial Number
                 </span>
-                <p className="font-medium">{typedAssignment.asset.serialNumber}</p>
+                <p className="font-medium">
+                  {typedAssignment.asset.serialNumber}
+                </p>
               </div>
             )}
             {typedAssignment.asset.category && (
@@ -477,21 +495,21 @@ export default function AssignmentDetailPage({
                 </div>
               )}
 
-              {typedAssignment.status === "ACTIVE" && !typedAssignment.returnDate && (
-                <div className="relative">
-                  <div className="absolute -left-4 w-3 h-3 rounded-full border-2 border-muted-foreground bg-background" />
-                  <div>
-                    <span className="text-sm font-medium text-muted-foreground">
-                      Currently Assigned
-                    </span>
+              {typedAssignment.status === "ACTIVE" &&
+                !typedAssignment.returnDate && (
+                  <div className="relative">
+                    <div className="absolute -left-4 w-3 h-3 rounded-full border-2 border-muted-foreground bg-background" />
+                    <div>
+                      <span className="text-sm font-medium text-muted-foreground">
+                        Currently Assigned
+                      </span>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
             </div>
           </CardContent>
         </Card>
       </div>
     </div>
-
   );
 }

@@ -1,9 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { z } from "zod";
-import {
-  loginSchema,
-  registerSchema,
-} from "~/validators/auth.validator";
+import { loginSchema, registerSchema } from "~/validators/auth.validator";
 import {
   createAssetSchema,
   assignAssetSchema,
@@ -13,9 +10,7 @@ import {
   createUserSchema,
   updateUserSchema,
 } from "~/validators/user.validator";
-import {
-  createCompanySchema,
-} from "~/validators/company.validator";
+import { createCompanySchema } from "~/validators/company.validator";
 
 describe("loginSchema", () => {
   it("should accept valid credentials", () => {

@@ -12,7 +12,11 @@ export interface ErrorResponse {
 /**
  * Creates a standardized error response
  */
-export function errorResponse(message: string, status: number = 400, code?: string) {
+export function errorResponse(
+  message: string,
+  status: number = 400,
+  code?: string,
+) {
   return data<ErrorResponse>({ error: message, code }, { status });
 }
 
@@ -27,51 +31,60 @@ export function handlePrismaError(error: unknown) {
         // Unique constraint violation
         const target = (error.meta?.target as string[])?.join(", ") || "field";
         return data<ErrorResponse>(
-          { error: `A record with this ${target} already exists`, code: "DUPLICATE" },
-          { status: 409 }
+          {
+            error: `A record with this ${target} already exists`,
+            code: "DUPLICATE",
+          },
+          { status: 409 },
         );
       }
       case "P2025":
         // Record not found
         return data<ErrorResponse>(
           { error: "Record not found", code: "NOT_FOUND" },
-          { status: 404 }
+          { status: 404 },
         );
       case "P2003":
         // Foreign key constraint failed
         return data<ErrorResponse>(
           { error: "Related record not found", code: "FOREIGN_KEY" },
-          { status: 400 }
+          { status: 400 },
         );
       case "P2014":
         // Required relation violation
         return data<ErrorResponse>(
-          { error: "This record is required by other records", code: "REQUIRED_RELATION" },
-          { status: 400 }
+          {
+            error: "This record is required by other records",
+            code: "REQUIRED_RELATION",
+          },
+          { status: 400 },
         );
       case "P2016":
         // Query interpretation error
         return data<ErrorResponse>(
           { error: "Invalid query", code: "QUERY_ERROR" },
-          { status: 400 }
+          { status: 400 },
         );
       case "P2021":
         // Table not found
         return data<ErrorResponse>(
           { error: "Database table not found", code: "TABLE_NOT_FOUND" },
-          { status: 500 }
+          { status: 500 },
         );
       case "P2024":
         // Connection timeout
         return data<ErrorResponse>(
-          { error: "Database connection timeout. Please try again.", code: "TIMEOUT" },
-          { status: 503 }
+          {
+            error: "Database connection timeout. Please try again.",
+            code: "TIMEOUT",
+          },
+          { status: 503 },
         );
       default:
         console.error("Unhandled Prisma error:", error.code, error.message);
         return data<ErrorResponse>(
           { error: "A database error occurred", code: error.code },
-          { status: 500 }
+          { status: 500 },
         );
     }
   }
@@ -80,7 +93,7 @@ export function handlePrismaError(error: unknown) {
     console.error("Prisma validation error:", error.message);
     return data<ErrorResponse>(
       { error: "Invalid data provided", code: "VALIDATION_ERROR" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -88,7 +101,7 @@ export function handlePrismaError(error: unknown) {
     console.error("Prisma initialization error:", error.message);
     return data<ErrorResponse>(
       { error: "Unable to connect to database", code: "DB_INIT_ERROR" },
-      { status: 503 }
+      { status: 503 },
     );
   }
 
@@ -101,7 +114,7 @@ export function handlePrismaError(error: unknown) {
  * Returns the result or an error response.
  */
 export async function withPrismaErrorHandling<T>(
-  operation: () => Promise<T>
+  operation: () => Promise<T>,
 ): Promise<T | ReturnType<typeof data>> {
   try {
     return await operation();
@@ -117,7 +130,7 @@ export class AppError extends Error {
   constructor(
     message: string,
     public status: number = 400,
-    public code?: string
+    public code?: string,
   ) {
     super(message);
     this.name = "AppError";
@@ -131,7 +144,7 @@ export function handleError(error: unknown) {
   if (error instanceof AppError) {
     return data<ErrorResponse>(
       { error: error.message, code: error.code },
-      { status: error.status }
+      { status: error.status },
     );
   }
 
@@ -143,7 +156,7 @@ export function handleError(error: unknown) {
     console.error("Unhandled error:", error);
     return data<ErrorResponse>(
       { error: "An unexpected error occurred" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -49,7 +49,7 @@ function isValidImageType(mimeType: string): boolean {
  */
 export async function uploadFile(
   file: File,
-  subfolder: string = ""
+  subfolder: string = "",
 ): Promise<UploadResult> {
   try {
     await ensureUploadDir();
@@ -74,11 +74,11 @@ export async function uploadFile(
     // Generate unique filename
     const extension = getExtension(file.name);
     const uniqueFilename = `${uuidv4()}${extension}`;
-    
+
     // Create subfolder if specified
     let uploadPath = UPLOAD_DIR;
     let urlPath = "/uploads";
-    
+
     if (subfolder) {
       uploadPath = join(UPLOAD_DIR, subfolder);
       urlPath = `/uploads/${subfolder}`;
@@ -109,7 +109,7 @@ export async function uploadFile(
  */
 export async function uploadFiles(
   files: File[],
-  subfolder: string = ""
+  subfolder: string = "",
 ): Promise<UploadResult[]> {
   return Promise.all(files.map((file) => uploadFile(file, subfolder)));
 }

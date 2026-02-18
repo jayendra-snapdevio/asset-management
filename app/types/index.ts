@@ -1,7 +1,23 @@
-import type { User, Company, Asset, Assignment, Role, AssetStatus, AssignmentStatus } from "@prisma/client";
+import type {
+  User,
+  Company,
+  Asset,
+  Assignment,
+  Role,
+  AssetStatus,
+  AssignmentStatus,
+} from "@prisma/client";
 
 // Re-export Prisma types
-export type { User, Company, Asset, Assignment, Role, AssetStatus, AssignmentStatus };
+export type {
+  User,
+  Company,
+  Asset,
+  Assignment,
+  Role,
+  AssetStatus,
+  AssignmentStatus,
+};
 
 // User with relations
 export type UserWithCompany = User & {

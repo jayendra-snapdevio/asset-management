@@ -1,6 +1,6 @@
 /**
  * Consolidated schema exports for form validation.
- * 
+ *
  * This file re-exports all Zod schemas from the validators directory
  * for convenient access throughout the application.
  */

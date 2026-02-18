@@ -57,7 +57,6 @@ import {
   Trash2,
 } from "lucide-react";
 
-
 export function meta() {
   return [{ title: "Companies - Asset Management" }];
 }
@@ -88,13 +87,19 @@ export async function action({ request }: Route.ActionArgs) {
   if (intent === "delete") {
     const companyId = formData.get("companyId") as string;
     if (!companyId) {
-      return data({ error: "Company ID is required", success: false }, { status: 400 });
+      return data(
+        { error: "Company ID is required", success: false },
+        { status: 400 },
+      );
     }
-    
+
     try {
       const result = await deleteCompany(companyId, user.id);
       if (!result) {
-        return data({ error: "Failed to delete company", success: false }, { status: 400 });
+        return data(
+          { error: "Failed to delete company", success: false },
+          { status: 400 },
+        );
       }
       return data({ success: true, message: "Company deleted successfully" });
     } catch (error) {
@@ -153,7 +158,9 @@ export default function CompaniesPage({
       )}
       {actionData && "success" in actionData && actionData.success && (
         <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-md">
-          {"message" in actionData ? (actionData.message as string) : "Action completed successfully"}
+          {"message" in actionData
+            ? (actionData.message as string)
+            : "Action completed successfully"}
         </div>
       )}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -184,20 +191,32 @@ export default function CompaniesPage({
                   name="name"
                   placeholder="Enter company name"
                   required
-                  error={actionData && "errors" in actionData ? (actionData.errors as any)?.name : undefined}
+                  error={
+                    actionData && "errors" in actionData
+                      ? (actionData.errors as any)?.name
+                      : undefined
+                  }
                 />
                 <FormField
                   label="Email"
                   name="email"
                   type="email"
                   placeholder="company@example.com"
-                  error={actionData && "errors" in actionData ? (actionData.errors as any)?.email : undefined}
+                  error={
+                    actionData && "errors" in actionData
+                      ? (actionData.errors as any)?.email
+                      : undefined
+                  }
                 />
                 <FormField
                   label="Phone"
                   name="phone"
                   placeholder="+1 234 567 890"
-                  error={actionData && "errors" in actionData ? (actionData.errors as any)?.phone : undefined}
+                  error={
+                    actionData && "errors" in actionData
+                      ? (actionData.errors as any)?.phone
+                      : undefined
+                  }
                 />
                 <FormField
                   label="Address"
@@ -328,20 +347,37 @@ export default function CompaniesPage({
                     </TableCell>
                     <TableCell className="text-center">
                       <div className="flex justify-start gap-1">
-                        <Button asChild variant="ghost" size="icon" className="h-8 w-8" title="View details">
+                        <Button
+                          asChild
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          title="View details"
+                        >
                           <Link to={`/dashboard/companies/${company.id}`}>
                             <Eye className="h-3 w-3" />
                           </Link>
                         </Button>
-                        <Button asChild variant="ghost" size="icon" className="h-8 w-8" title="Edit company">
+                        <Button
+                          asChild
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          title="Edit company"
+                        >
                           <Link to={`/dashboard/companies/${company.id}`}>
                             <Edit2 className="h-3 w-3" />
                           </Link>
                         </Button>
-                        
+
                         <Dialog>
                           <DialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" title="Delete company">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                              title="Delete company"
+                            >
                               <Trash2 className="h-3 w-3" />
                             </Button>
                           </DialogTrigger>
@@ -349,21 +385,40 @@ export default function CompaniesPage({
                             <DialogHeader>
                               <DialogTitle>Delete Company</DialogTitle>
                               <DialogDescription>
-                                Are you sure you want to delete {company.name}? This will mark the company as inactive. 
-                                {company._count.users > 0 && ` This company has ${company._count.users} users.`}
-                                {company._count.assets > 0 && ` This company has ${company._count.assets} assets.`}
+                                Are you sure you want to delete {company.name}?
+                                This will mark the company as inactive.
+                                {company._count.users > 0 &&
+                                  ` This company has ${company._count.users} users.`}
+                                {company._count.assets > 0 &&
+                                  ` This company has ${company._count.assets} assets.`}
                               </DialogDescription>
                             </DialogHeader>
                             <DialogFooter className="mt-4">
                               <Form method="post">
-                                <input type="hidden" name="intent" value="delete" />
-                                <input type="hidden" name="companyId" value={company.id} />
+                                <input
+                                  type="hidden"
+                                  name="intent"
+                                  value="delete"
+                                />
+                                <input
+                                  type="hidden"
+                                  name="companyId"
+                                  value={company.id}
+                                />
                                 <div className="flex gap-2 justify-end">
                                   <DialogTrigger asChild>
-                                    <Button type="button" variant="outline">Cancel</Button>
+                                    <Button type="button" variant="outline">
+                                      Cancel
+                                    </Button>
                                   </DialogTrigger>
-                                  <Button type="submit" variant="destructive" disabled={isSubmitting}>
-                                    {isSubmitting ? "Deleting..." : "Delete Company"}
+                                  <Button
+                                    type="submit"
+                                    variant="destructive"
+                                    disabled={isSubmitting}
+                                  >
+                                    {isSubmitting
+                                      ? "Deleting..."
+                                      : "Delete Company"}
                                   </Button>
                                 </div>
                               </Form>

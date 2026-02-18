@@ -1,4 +1,10 @@
-import { PrismaClient, Role, AssetStatus, AssignmentStatus, OwnershipType } from "@prisma/client";
+import {
+  PrismaClient,
+  Role,
+  AssetStatus,
+  AssignmentStatus,
+  OwnershipType,
+} from "@prisma/client";
 import bcrypt from "bcryptjs";
 import seedData from "../defaultvalue/seed-data";
 
@@ -19,7 +25,9 @@ async function main() {
 
   const { Companies, User, Assets, Assignment } = seedData;
 
-  console.log(`📦 Found ${Companies.length} companies, ${User.length} users, ${Assets.length} assets, and ${Assignment.length} assignments.`);
+  console.log(
+    `📦 Found ${Companies.length} companies, ${User.length} users, ${Assets.length} assets, and ${Assignment.length} assignments.`,
+  );
 
   // 1. Seed Companies
   console.log("🏢 Seeding Companies...");
@@ -47,7 +55,9 @@ async function main() {
     let password = "password123"; // default fallback
 
     // Special password logic for Snapdevio
-    const isSnapdevio = u.email.endsWith("@snapdevio.com") || u.email === "chintandhokai97@gmail.com";
+    const isSnapdevio =
+      u.email.endsWith("@snapdevio.com") ||
+      u.email === "chintandhokai97@gmail.com";
     if (isSnapdevio) {
       if (u.role === "OWNER" || u.role === "ADMIN") {
         password = "password123";
@@ -87,7 +97,9 @@ async function main() {
         serialNumber: a.serialNumber,
         model: a.model,
         manufacturer: a.manufacturer,
-        purchaseDate: a.purchaseDate?.$date ? new Date(a.purchaseDate.$date) : null,
+        purchaseDate: a.purchaseDate?.$date
+          ? new Date(a.purchaseDate.$date)
+          : null,
         purchasePrice: a.purchasePrice,
         currentValue: a.currentValue,
         location: a.location,
@@ -114,8 +126,16 @@ async function main() {
         assetId: asgn.assetId.$oid,
         userId: asgn.userId.$oid,
         assignedDate: new Date(asgn.assignedDate.$date),
-        dueDate: asgn.dueDate?.$date ? new Date(asgn.dueDate.$date) : (asgn.dueDate ? new Date(asgn.dueDate as any) : null),
-        returnDate: asgn.returnDate?.$date ? new Date(asgn.returnDate.$date) : (asgn.returnDate ? new Date(asgn.returnDate as any) : null),
+        dueDate: asgn.dueDate?.$date
+          ? new Date(asgn.dueDate.$date)
+          : asgn.dueDate
+            ? new Date(asgn.dueDate as any)
+            : null,
+        returnDate: asgn.returnDate?.$date
+          ? new Date(asgn.returnDate.$date)
+          : asgn.returnDate
+            ? new Date(asgn.returnDate as any)
+            : null,
         notes: asgn.notes,
         status: asgn.status as AssignmentStatus,
         createdAt: new Date(asgn.createdAt.$date),
@@ -136,14 +156,18 @@ async function main() {
   console.log("\n🔑 Login credentials:");
   console.log("Snapdevio:");
   console.log("  - Owner/Admin: password123");
-  console.log("  - Users: firstname@snapdevio406 (e.g., jayendra@snapdevio406)");
+  console.log(
+    "  - Users: firstname@snapdevio406 (e.g., jayendra@snapdevio406)",
+  );
   console.log("TechCorp:");
   console.log("  - All users: password123");
   console.log("\n👤 Sample users:");
   console.log("Snapdevio:");
   console.log("- Owner: owner@snapdevio.com");
   console.log("- Admin: admin@snapdevio.com");
-  console.log("- User: jayendra.ramani@snapdevio.com (password: jayendra@snapdevio406)");
+  console.log(
+    "- User: jayendra.ramani@snapdevio.com (password: jayendra@snapdevio406)",
+  );
   console.log("TechCorp:");
   console.log("- Owner: owner@techcorp.com");
   console.log("- Admin: admin@techcorp.com");

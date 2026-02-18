@@ -1,4 +1,4 @@
-import { redirect,Form, Link, useNavigation } from "react-router";
+import { redirect, Form, Link, useNavigation } from "react-router";
 import type { Route } from "./+types/_dashboard.user.assignments.new";
 import { requireRole } from "~/lib/session.server";
 import { getCompanyFilter } from "~/services/company.service.server";
@@ -8,7 +8,13 @@ import {
   validateAssetForAssignment,
   createAssignment,
 } from "~/services/assignment.service.server";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { FormField } from "~/components/forms/form-field";
 import { FormSelect } from "~/components/forms/form-select";
@@ -44,7 +50,10 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   // Validate asset
-  const assetValidation = await validateAssetForAssignment(assetId, companyFilter);
+  const assetValidation = await validateAssetForAssignment(
+    assetId,
+    companyFilter,
+  );
   if (!assetValidation.valid) {
     return errorResponse(assetValidation.error || "Invalid asset");
   }
@@ -67,7 +76,10 @@ export async function action({ request }: Route.ActionArgs) {
   }
 }
 
-export default function NewUserAssignmentPage({ loaderData, actionData }: Route.ComponentProps) {
+export default function NewUserAssignmentPage({
+  loaderData,
+  actionData,
+}: Route.ComponentProps) {
   const { availableAssets, user } = loaderData;
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
@@ -89,9 +101,7 @@ export default function NewUserAssignmentPage({ loaderData, actionData }: Route.
       <Card className="w-full">
         <CardHeader>
           <CardTitle>Assignment Details</CardTitle>
-          <CardDescription>
-            Select an available asset to claim
-          </CardDescription>
+          <CardDescription>Select an available asset to claim</CardDescription>
         </CardHeader>
         <CardContent>
           {actionData?.error && (
@@ -105,7 +115,8 @@ export default function NewUserAssignmentPage({ loaderData, actionData }: Route.
             <Alert className="mb-6">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                No available assets to assign. All assets are currently assigned or in other states.
+                No available assets to assign. All assets are currently assigned
+                or in other states.
               </AlertDescription>
             </Alert>
           ) : (
@@ -146,7 +157,9 @@ export default function NewUserAssignmentPage({ loaderData, actionData }: Route.
 
               <div className="flex gap-4">
                 <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {isSubmitting && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
                   Claim Asset
                 </Button>
                 <Link to="/dashboard/my-assets">

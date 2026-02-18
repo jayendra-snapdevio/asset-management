@@ -2,7 +2,11 @@ import { useState } from "react";
 import { data, redirect, Form, Link, useNavigation } from "react-router";
 import type { Route } from "./+types/_dashboard.companies.$id";
 import { requireRole } from "~/lib/session.server";
-import { getCompanyById, updateCompany, deleteCompany } from "~/services/company.service.server";
+import {
+  getCompanyById,
+  updateCompany,
+  deleteCompany,
+} from "~/services/company.service.server";
 import { updateCompanySchema } from "~/validators/company.validator";
 import {
   Card,
@@ -76,13 +80,16 @@ export async function action({ request, params }: Route.ActionArgs) {
     if (!result.success) {
       return data(
         { errors: result.error.flatten().fieldErrors, success: false },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     const updated = await updateCompany(params.id, user.id, result.data);
     if (!updated) {
-      return data({ error: "Company not found", success: false }, { status: 404 });
+      return data(
+        { error: "Company not found", success: false },
+        { status: 404 },
+      );
     }
 
     return data({ success: true, message: "Company updated successfully" });
@@ -91,7 +98,10 @@ export async function action({ request, params }: Route.ActionArgs) {
   if (intent === "delete") {
     const deleted = await deleteCompany(params.id, user.id);
     if (!deleted) {
-      return data({ error: "Company not found", success: false }, { status: 404 });
+      return data(
+        { error: "Company not found", success: false },
+        { status: 404 },
+      );
     }
 
     return redirect("/dashboard/companies");
@@ -145,7 +155,9 @@ export default function CompanyDetailPage({
               <Building2 className="h-8 w-8" />
               {company.name}
             </h1>
-            <p className="text-muted-foreground">Manage company details and users</p>
+            <p className="text-muted-foreground">
+              Manage company details and users
+            </p>
           </div>
         </div>
 
@@ -160,8 +172,9 @@ export default function CompanyDetailPage({
             <DialogHeader>
               <DialogTitle>Delete Company</DialogTitle>
               <DialogDescription>
-                Are you sure you want to delete "{company.name}"? This action will
-                deactivate the company and all associated data. This cannot be undone.
+                Are you sure you want to delete "{company.name}"? This action
+                will deactivate the company and all associated data. This cannot
+                be undone.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
@@ -173,7 +186,11 @@ export default function CompanyDetailPage({
               </Button>
               <Form method="post">
                 <input type="hidden" name="intent" value="delete" />
-                <Button type="submit" variant="destructive" disabled={isSubmitting}>
+                <Button
+                  type="submit"
+                  variant="destructive"
+                  disabled={isSubmitting}
+                >
                   {isSubmitting ? "Deleting..." : "Delete Company"}
                 </Button>
               </Form>
@@ -235,7 +252,11 @@ export default function CompanyDetailPage({
                 name="name"
                 defaultValue={company.name}
                 required
-                error={actionData && "errors" in actionData ? actionData.errors?.name : undefined}
+                error={
+                  actionData && "errors" in actionData
+                    ? actionData.errors?.name
+                    : undefined
+                }
               />
 
               <FormField
@@ -243,14 +264,22 @@ export default function CompanyDetailPage({
                 name="email"
                 type="email"
                 defaultValue={company.email || ""}
-                error={actionData && "errors" in actionData ? actionData.errors?.email : undefined}
+                error={
+                  actionData && "errors" in actionData
+                    ? actionData.errors?.email
+                    : undefined
+                }
               />
 
               <FormField
                 label="Phone"
                 name="phone"
                 defaultValue={company.phone || ""}
-                error={actionData && "errors" in actionData ? actionData.errors?.phone : undefined}
+                error={
+                  actionData && "errors" in actionData
+                    ? actionData.errors?.phone
+                    : undefined
+                }
               />
 
               <FormField
@@ -258,7 +287,11 @@ export default function CompanyDetailPage({
                 name="website"
                 type="url"
                 defaultValue={company.website || ""}
-                error={actionData && "errors" in actionData ? actionData.errors?.website : undefined}
+                error={
+                  actionData && "errors" in actionData
+                    ? actionData.errors?.website
+                    : undefined
+                }
               />
             </div>
 
@@ -283,9 +316,7 @@ export default function CompanyDetailPage({
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>Company Users</CardTitle>
-            <CardDescription>
-              Users assigned to this company
-            </CardDescription>
+            <CardDescription>Users assigned to this company</CardDescription>
           </div>
           <Button asChild>
             <Link to={`/dashboard/companies/${company.id}/admins`}>
@@ -298,7 +329,9 @@ export default function CompanyDetailPage({
           {company.users.length === 0 ? (
             <div className="text-center py-8">
               <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">No users in this company yet.</p>
+              <p className="text-muted-foreground">
+                No users in this company yet.
+              </p>
               <Button asChild className="mt-4" variant="outline">
                 <Link to={`/dashboard/companies/${company.id}/admins`}>
                   <UserPlus className="h-4 w-4 mr-2" />
@@ -320,19 +353,23 @@ export default function CompanyDetailPage({
                 {typedCompany.users.map((user) => (
                   <TableRow key={user.id}>
                     <TableCell className="font-medium">
-                      <Link to={`/dashboard/users/${user.id}`} className="hover:underline text-primary">
+                      <Link
+                        to={`/dashboard/users/${user.id}`}
+                        className="hover:underline text-primary"
+                      >
                         {user.firstName} {user.lastName}
                       </Link>
                     </TableCell>
                     <TableCell>
-                      <Link to={`/dashboard/users/${user.id}`} className="hover:underline text-primary">
+                      <Link
+                        to={`/dashboard/users/${user.id}`}
+                        className="hover:underline text-primary"
+                      >
                         {user.email}
                       </Link>
                     </TableCell>
                     <TableCell>{getRoleBadge(user.role)}</TableCell>
-                    <TableCell>
-                      {formatDate(user.createdAt)}
-                    </TableCell>
+                    <TableCell>{formatDate(user.createdAt)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

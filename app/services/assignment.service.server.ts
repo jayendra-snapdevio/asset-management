@@ -25,9 +25,13 @@ interface CompanyFilter {
 
 // Helper to normalize company filter for asset queries
 function normalizeAssetCompanyFilter(
-  companyFilter: CompanyFilter
+  companyFilter: CompanyFilter,
 ): Prisma.AssetWhereInput {
-  if (companyFilter.companyId && typeof companyFilter.companyId === "object" && "in" in companyFilter.companyId) {
+  if (
+    companyFilter.companyId &&
+    typeof companyFilter.companyId === "object" &&
+    "in" in companyFilter.companyId
+  ) {
     return { companyId: companyFilter.companyId as { in: string[] } };
   }
   const id = companyFilter.companyId as string | null;
@@ -36,9 +40,13 @@ function normalizeAssetCompanyFilter(
 
 // Helper to normalize company filter for user queries
 function normalizeUserCompanyFilter(
-  companyFilter: CompanyFilter
+  companyFilter: CompanyFilter,
 ): Prisma.UserWhereInput {
-  if (companyFilter.companyId && typeof companyFilter.companyId === "object" && "in" in companyFilter.companyId) {
+  if (
+    companyFilter.companyId &&
+    typeof companyFilter.companyId === "object" &&
+    "in" in companyFilter.companyId
+  ) {
     return { companyId: { in: companyFilter.companyId.in } };
   }
   const id = companyFilter.companyId as string | null;
@@ -51,7 +59,7 @@ function normalizeUserCompanyFilter(
 export async function getAssignments(
   companyFilter: CompanyFilter,
   { page, limit }: PaginationParams,
-  filters: AssignmentFilters = {}
+  filters: AssignmentFilters = {},
 ) {
   const where: any = {
     asset: companyFilter,
@@ -83,8 +91,8 @@ export async function getAssignments(
   ]);
 
   // Get unique user and asset IDs
-  const userIds = [...new Set(rawAssignments.map(a => a.userId))];
-  const assetIds = [...new Set(rawAssignments.map(a => a.assetId))];
+  const userIds = [...new Set(rawAssignments.map((a) => a.userId))];
+  const assetIds = [...new Set(rawAssignments.map((a) => a.assetId))];
 
   // Fetch users and assets
   const [users, assets] = await Promise.all([
@@ -94,17 +102,23 @@ export async function getAssignments(
     }),
     prisma.asset.findMany({
       where: { id: { in: assetIds } },
-      select: { id: true, name: true, serialNumber: true, status: true, imageUrl: true },
+      select: {
+        id: true,
+        name: true,
+        serialNumber: true,
+        status: true,
+        imageUrl: true,
+      },
     }),
   ]);
 
-  const userMap = new Map(users.map(u => [u.id, u]));
-  const assetMap = new Map(assets.map(a => [a.id, a]));
+  const userMap = new Map(users.map((u) => [u.id, u]));
+  const assetMap = new Map(assets.map((a) => [a.id, a]));
 
   // Filter assignments with valid user and asset, then map
   const assignments = rawAssignments
-    .filter(a => userMap.has(a.userId) && assetMap.has(a.assetId))
-    .map(a => ({
+    .filter((a) => userMap.has(a.userId) && assetMap.has(a.assetId))
+    .map((a) => ({
       ...a,
       user: userMap.get(a.userId)!,
       asset: assetMap.get(a.assetId)!,
@@ -126,7 +140,7 @@ export async function getAssignments(
  */
 export async function getAssignmentById(
   assignmentId: string,
-  companyFilter: CompanyFilter
+  companyFilter: CompanyFilter,
 ) {
   const assetFilter = normalizeAssetCompanyFilter(companyFilter);
   return prisma.assignment.findFirst({
@@ -203,7 +217,7 @@ export async function getActiveUsers(companyFilter: CompanyFilter) {
  */
 export async function validateAssetForAssignment(
   assetId: string,
-  companyFilter: CompanyFilter
+  companyFilter: CompanyFilter,
 ) {
   const assetWhere = normalizeAssetCompanyFilter(companyFilter);
   const asset = await prisma.asset.findFirst({
@@ -229,7 +243,7 @@ export async function validateAssetForAssignment(
  */
 export async function validateUserForAssignment(
   userId: string,
-  companyFilter: CompanyFilter
+  companyFilter: CompanyFilter,
 ) {
   const userWhere = normalizeUserCompanyFilter(companyFilter);
   const user = await prisma.user.findFirst({
@@ -286,7 +300,7 @@ export async function createAssignment(data: {
 export async function returnAssignment(
   assignmentId: string,
   notes?: string,
-  userId?: string
+  userId?: string,
 ) {
   const assignment = await prisma.assignment.findUnique({
     where: { id: assignmentId },
@@ -311,7 +325,9 @@ export async function returnAssignment(
       data: {
         status: "RETURNED",
         returnDate: new Date(),
-        notes: notes ? `${assignment.notes || ""}\nReturn notes: ${notes}`.trim() : assignment.notes,
+        notes: notes
+          ? `${assignment.notes || ""}\nReturn notes: ${notes}`.trim()
+          : assignment.notes,
       },
     }),
     prisma.asset.update({
@@ -329,7 +345,7 @@ export async function returnAssignment(
 export async function transferAssignment(
   assignmentId: string,
   newUserId: string,
-  notes?: string
+  notes?: string,
 ) {
   const assignment = await prisma.assignment.findUnique({
     where: { id: assignmentId },
@@ -355,7 +371,9 @@ export async function transferAssignment(
       data: {
         status: "TRANSFERRED",
         returnDate: new Date(),
-        notes: notes ? `${assignment.notes || ""}\nTransfer notes: ${notes}`.trim() : assignment.notes,
+        notes: notes
+          ? `${assignment.notes || ""}\nTransfer notes: ${notes}`.trim()
+          : assignment.notes,
       },
     }),
     // Create new assignment for the new user
@@ -391,17 +409,17 @@ export async function getAssetAssignmentHistory(assetId: string) {
   });
 
   // Fetch valid users
-  const userIds = [...new Set(assignments.map(a => a.userId))];
+  const userIds = [...new Set(assignments.map((a) => a.userId))];
   const users = await prisma.user.findMany({
     where: { id: { in: userIds } },
     select: { id: true, firstName: true, lastName: true, email: true },
   });
-  const userMap = new Map(users.map(u => [u.id, u]));
+  const userMap = new Map(users.map((u) => [u.id, u]));
 
   // Filter and map assignments with valid users
   return assignments
-    .filter(a => userMap.has(a.userId))
-    .map(a => ({
+    .filter((a) => userMap.has(a.userId))
+    .map((a) => ({
       ...a,
       user: userMap.get(a.userId)!,
     }));
@@ -412,7 +430,7 @@ export async function getAssetAssignmentHistory(assetId: string) {
  */
 export async function getUserAssignments(
   userId: string,
-  status?: AssignmentStatus
+  status?: AssignmentStatus,
 ) {
   return prisma.assignment.findMany({
     where: {
@@ -439,10 +457,10 @@ export async function getUserAssignments(
  */
 export async function deleteAssignment(
   assignmentId: string,
-  companyFilter: CompanyFilter
+  companyFilter: CompanyFilter,
 ) {
   const assetFilter = normalizeAssetCompanyFilter(companyFilter);
-  
+
   const assignment = await prisma.assignment.findFirst({
     where: {
       id: assignmentId,

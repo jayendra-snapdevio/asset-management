@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { toast } from "sonner";
 import { data, Form, Link, useNavigation, useSearchParams } from "react-router";
 import type { Route } from "./+types/_dashboard.assets";
 // Server-only imports moved to loader/action to avoid Vite leakage
@@ -32,7 +33,11 @@ import {
 } from "~/components/ui/dialog";
 import { Badge } from "~/components/ui/badge";
 import { Pagination } from "~/components/shared/Pagination";
-import { Tooltip, TooltipTrigger, TooltipContent } from "~/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "~/components/ui/tooltip";
 import {
   Package,
   Plus,
@@ -44,7 +49,12 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { ASSET_STATUS_LABELS, ASSET_STATUS_COLORS, ASSET_CATEGORIES, OWNERSHIP_TYPE_LABELS } from "~/constants";
+import {
+  ASSET_STATUS_LABELS,
+  ASSET_STATUS_COLORS,
+  ASSET_CATEGORIES,
+  OWNERSHIP_TYPE_LABELS,
+} from "~/constants";
 import { format } from "date-fns";
 import type { AssetListItem } from "~/types";
 
@@ -54,7 +64,8 @@ export function meta() {
 
 export async function loader({ request }: Route.LoaderArgs) {
   const { requireRole } = await import("../lib/session.server");
-  const { getCompanyFilter } = await import("../services/company.service.server");
+  const { getCompanyFilter } =
+    await import("../services/company.service.server");
   const { getAssets } = await import("../services/asset.service.server");
   const { getUsers } = await import("../services/user.service.server");
 
@@ -67,7 +78,9 @@ export async function loader({ request }: Route.LoaderArgs) {
   const status = url.searchParams.get("status") as AssetStatus | undefined;
   const category = url.searchParams.get("category") || undefined;
   const sortBy = url.searchParams.get("sortBy") || "createdAt";
-  const sortOrder = (url.searchParams.get("sortOrder") || "desc") as "asc" | "desc";
+  const sortOrder = (url.searchParams.get("sortOrder") || "desc") as
+    | "asc"
+    | "desc";
   const limit = parseInt(url.searchParams.get("limit") || "10");
   const ownerId = url.searchParams.get("ownerId") || undefined;
 
@@ -106,7 +119,8 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 export async function action({ request }: Route.ActionArgs) {
   const { requireRole } = await import("../lib/session.server");
-  const { getCompanyFilter } = await import("../services/company.service.server");
+  const { getCompanyFilter } =
+    await import("../services/company.service.server");
   const { deleteAsset } = await import("../services/asset.service.server");
 
   const user = await requireRole(request, ["OWNER", "ADMIN"]);
@@ -117,9 +131,12 @@ export async function action({ request }: Route.ActionArgs) {
   if (intent === "delete") {
     const assetId = formData.get("assetId") as string;
     if (!assetId) {
-      return data({ error: "Asset ID is required", success: false }, { status: 400 });
+      return data(
+        { error: "Asset ID is required", success: false },
+        { status: 400 },
+      );
     }
-    
+
     try {
       const result = await deleteAsset(assetId, companyFilter);
       if (result.error) {
@@ -128,18 +145,37 @@ export async function action({ request }: Route.ActionArgs) {
       return data({ success: true, message: "Asset retired successfully" });
     } catch (error) {
       console.error("Delete asset error:", error);
-      return data({ error: "Failed to delete asset", success: false }, { status: 500 });
+      return data(
+        { error: "Failed to delete asset", success: false },
+        { status: 500 },
+      );
     }
   }
 
   return null;
 }
 
-export default function AssetsPage({ loaderData, actionData }: Route.ComponentProps) {
-  const { user, assets, categories, pagination, filters, potentialOwners } = loaderData;
+export default function AssetsPage({
+  loaderData,
+  actionData,
+}: Route.ComponentProps) {
+  const { user, assets, categories, pagination, filters, potentialOwners } =
+    loaderData;
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
   const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    if (actionData && "success" in (actionData as any)) {
+      if ((actionData as any).success) {
+        toast.success(
+          (actionData as any).message || "Action completed successfully",
+        );
+      } else if ((actionData as any).error) {
+        toast.error((actionData as any).error);
+      }
+    }
+  }, [actionData]);
   const canManageAssets = user.role === "OWNER" || user.role === "ADMIN";
 
   const typedAssets = assets as unknown as AssetListItem[];
@@ -198,26 +234,19 @@ export default function AssetsPage({ loaderData, actionData }: Route.ComponentPr
     );
   };
 
-  const hasFilters = filters.search || filters.status || filters.category || filters.ownerId;
+  const hasFilters =
+    filters.search || filters.status || filters.category || filters.ownerId;
 
   const [ownerSearch, setOwnerSearch] = useState("");
 
   const filteredOwners = potentialOwners.filter((owner: any) =>
-    `${owner.firstName} ${owner.lastName}`.toLowerCase().includes(ownerSearch.toLowerCase())
+    `${owner.firstName} ${owner.lastName}`
+      .toLowerCase()
+      .includes(ownerSearch.toLowerCase()),
   );
 
   return (
     <div className="space-y-6">
-      {actionData && "error" in actionData && actionData.error && (
-        <div className="bg-destructive/15 border border-destructive text-destructive px-4 py-3 rounded-md">
-          {actionData.error}
-        </div>
-      )}
-      {actionData && "success" in actionData && actionData.success && (
-        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-md">
-          {"message" in actionData ? actionData.message : "Action completed successfully"}
-        </div>
-      )}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold">Assets</h1>
@@ -225,7 +254,13 @@ export default function AssetsPage({ loaderData, actionData }: Route.ComponentPr
             Manage your organization's assets
           </p>
         </div>
-        <Link to={canManageAssets ? "/dashboard/assets/new" : "/dashboard/user/assets/new"}>
+        <Link
+          to={
+            canManageAssets
+              ? "/dashboard/assets/new"
+              : "/dashboard/user/assets/new"
+          }
+        >
           <Button className="w-full md:w-[180px]">
             <Plus className="h-4 w-4" />
             Add Asset
@@ -238,7 +273,10 @@ export default function AssetsPage({ loaderData, actionData }: Route.ComponentPr
         <CardContent className="pt-1">
           <div className="flex flex-wrap gap-4">
             {/* Search Form */}
-            <form onSubmit={handleSearch} className="flex gap-2 flex-1 min-w-[200px]">
+            <form
+              onSubmit={handleSearch}
+              className="flex gap-2 flex-1 min-w-[200px]"
+            >
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -265,7 +303,9 @@ export default function AssetsPage({ loaderData, actionData }: Route.ComponentPr
                 <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="AVAILABLE">Available</SelectItem>
                 <SelectItem value="ASSIGNED">Assigned</SelectItem>
-                <SelectItem value="UNDER_MAINTENANCE">Under Maintenance</SelectItem>
+                <SelectItem value="UNDER_MAINTENANCE">
+                  Under Maintenance
+                </SelectItem>
                 <SelectItem value="RETIRED">Retired</SelectItem>
               </SelectContent>
             </Select>
@@ -286,7 +326,7 @@ export default function AssetsPage({ loaderData, actionData }: Route.ComponentPr
                   </SelectItem>
                 ))}
                 {ASSET_CATEGORIES.filter(
-                  (c) => !categories.includes(c.value)
+                  (c) => !categories.includes(c.value),
                 ).map((cat) => (
                   <SelectItem key={cat.value} value={cat.value}>
                     {cat.label}
@@ -334,7 +374,12 @@ export default function AssetsPage({ loaderData, actionData }: Route.ComponentPr
             )}
 
             {hasFilters && (
-              <Button variant="ghost" size="sm" className="md:w-[180px] w-full" onClick={clearFilters}>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="md:w-[180px] w-full"
+                onClick={clearFilters}
+              >
                 <X className="h-4 w-4 mr-1" />
                 Clear Filters
               </Button>
@@ -428,17 +473,27 @@ export default function AssetsPage({ loaderData, actionData }: Route.ComponentPr
                           {asset.ownershipType ? (
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <Badge variant="secondary" className="bg-slate-100 text-slate-800 w-fit cursor-help">
-                                  {OWNERSHIP_TYPE_LABELS[asset.ownershipType as keyof typeof OWNERSHIP_TYPE_LABELS] || asset.ownershipType}
+                                <Badge
+                                  variant="secondary"
+                                  className="bg-slate-100 text-slate-800 w-fit cursor-help"
+                                >
+                                  {OWNERSHIP_TYPE_LABELS[
+                                    asset.ownershipType as keyof typeof OWNERSHIP_TYPE_LABELS
+                                  ] || asset.ownershipType}
                                 </Badge>
                               </TooltipTrigger>
                               <TooltipContent>
-                                {asset.ownershipType === "PRIVATE" && asset.owner && (
-                                  <span>Owner: {asset.owner.firstName} {asset.owner.lastName}</span>
-                                )}
-                                {asset.ownershipType === "OTHER" && asset.otherOwnership && (
-                                  <span>Details: {asset.otherOwnership}</span>
-                                )}
+                                {asset.ownershipType === "PRIVATE" &&
+                                  asset.owner && (
+                                    <span>
+                                      Owner: {asset.owner.firstName}{" "}
+                                      {asset.owner.lastName}
+                                    </span>
+                                  )}
+                                {asset.ownershipType === "OTHER" &&
+                                  asset.otherOwnership && (
+                                    <span>Details: {asset.otherOwnership}</span>
+                                  )}
                                 {asset.ownershipType === "COMPANY" && (
                                   <span>Company Owned Asset</span>
                                 )}
@@ -468,23 +523,40 @@ export default function AssetsPage({ loaderData, actionData }: Route.ComponentPr
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-start gap-1">
-                          <Button asChild variant="ghost" size="icon" className="h-8 w-8" title="View details">
+                          <Button
+                            asChild
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            title="View details"
+                          >
                             <Link to={`/dashboard/assets/${asset.id}`}>
                               <Eye className="h-3 w-3" />
                             </Link>
                           </Button>
-                          
+
                           {canManageAssets && (
                             <>
-                              <Button asChild variant="ghost" size="icon" className="h-8 w-8" title="Edit asset">
+                              <Button
+                                asChild
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                title="Edit asset"
+                              >
                                 <Link to={`/dashboard/assets/${asset.id}`}>
                                   <Edit2 className="h-3 w-3" />
                                 </Link>
                               </Button>
-                              
+
                               <Dialog>
                                 <DialogTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" title="Delete asset">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                    title="Delete asset"
+                                  >
                                     <Trash2 className="h-3 w-3" />
                                   </Button>
                                 </DialogTrigger>
@@ -492,20 +564,42 @@ export default function AssetsPage({ loaderData, actionData }: Route.ComponentPr
                                   <DialogHeader>
                                     <DialogTitle>Delete Asset</DialogTitle>
                                     <DialogDescription>
-                                      Are you sure you want to retire {asset.name}? This will set its status to RETIRED. 
-                                      {asset.status === "ASSIGNED" && " Note: This asset is currently assigned."}
+                                      Are you sure you want to retire{" "}
+                                      {asset.name}? This will set its status to
+                                      RETIRED.
+                                      {asset.status === "ASSIGNED" &&
+                                        " Note: This asset is currently assigned."}
                                     </DialogDescription>
                                   </DialogHeader>
                                   <DialogFooter className="mt-4">
                                     <Form method="post">
-                                      <input type="hidden" name="intent" value="delete" />
-                                      <input type="hidden" name="assetId" value={asset.id} />
+                                      <input
+                                        type="hidden"
+                                        name="intent"
+                                        value="delete"
+                                      />
+                                      <input
+                                        type="hidden"
+                                        name="assetId"
+                                        value={asset.id}
+                                      />
                                       <div className="flex gap-2 justify-end">
                                         <DialogTrigger asChild>
-                                          <Button type="button" variant="outline">Cancel</Button>
+                                          <Button
+                                            type="button"
+                                            variant="outline"
+                                          >
+                                            Cancel
+                                          </Button>
                                         </DialogTrigger>
-                                        <Button type="submit" variant="destructive" disabled={isSubmitting}>
-                                          {isSubmitting ? "Deleting..." : "Delete Asset"}
+                                        <Button
+                                          type="submit"
+                                          variant="destructive"
+                                          disabled={isSubmitting}
+                                        >
+                                          {isSubmitting
+                                            ? "Deleting..."
+                                            : "Delete Asset"}
                                         </Button>
                                       </div>
                                     </Form>

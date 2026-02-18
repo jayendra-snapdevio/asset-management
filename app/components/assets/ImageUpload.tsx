@@ -26,7 +26,11 @@ export function ImageUpload({
   onImageChange,
   canEdit = true,
 }: ImageUploadProps) {
-  const fetcher = useFetcher<{ success: boolean; imageUrl?: string | null; error?: string }>();
+  const fetcher = useFetcher<{
+    success: boolean;
+    imageUrl?: string | null;
+    error?: string;
+  }>();
   const deleteFetcher = useFetcher();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -75,11 +79,7 @@ export function ImageUpload({
   };
 
   const handleDelete = () => {
-
-    deleteFetcher.submit(
-      { intent: "delete-image" },
-      { method: "POST" }
-    );
+    deleteFetcher.submit({ intent: "delete-image" }, { method: "POST" });
 
     setPreviewUrl(null);
     onImageChange?.(null);
@@ -123,7 +123,9 @@ export function ImageUpload({
           {(isUploading || isDeleting) && (
             <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <span className="ml-2">{isDeleting ? "Deleting..." : "Uploading..."}</span>
+              <span className="ml-2">
+                {isDeleting ? "Deleting..." : "Uploading..."}
+              </span>
             </div>
           )}
 
@@ -162,7 +164,8 @@ export function ImageUpload({
                 <DialogHeader>
                   <DialogTitle>Remove Image</DialogTitle>
                   <DialogDescription>
-                    Are you sure you want to remove this asset image? This action will permanently delete the image file.
+                    Are you sure you want to remove this asset image? This
+                    action will permanently delete the image file.
                   </DialogDescription>
                 </DialogHeader>
                 <DialogFooter className="gap-2 sm:gap-2">

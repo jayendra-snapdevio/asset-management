@@ -13,15 +13,19 @@ import { join } from "path";
  */
 export async function action({ request }: Route.ActionArgs) {
   const user = await requireRole(request, ["ADMIN", "OWNER"]);
-  
+
   const formData = await request.formData();
   const file = formData.get("file") as File | null;
   const assetId = formData.get("assetId") as string | null;
 
   if (!file || !assetId) {
     return data(
-      { error: "File and assetId are required", success: false, imageUrl: null },
-      { status: 400 }
+      {
+        error: "File and assetId are required",
+        success: false,
+        imageUrl: null,
+      },
+      { status: 400 },
     );
   }
 
@@ -36,8 +40,12 @@ export async function action({ request }: Route.ActionArgs) {
 
   if (!asset) {
     return data(
-      { error: "Asset not found or unauthorized", success: false, imageUrl: null },
-      { status: 404 }
+      {
+        error: "Asset not found or unauthorized",
+        success: false,
+        imageUrl: null,
+      },
+      { status: 404 },
     );
   }
 
@@ -56,8 +64,12 @@ export async function action({ request }: Route.ActionArgs) {
 
   if (!result.success) {
     return data(
-      { error: result.error || "Upload failed", success: false, imageUrl: null },
-      { status: 400 }
+      {
+        error: result.error || "Upload failed",
+        success: false,
+        imageUrl: null,
+      },
+      { status: 400 },
     );
   }
 
@@ -72,15 +84,15 @@ export async function action({ request }: Route.ActionArgs) {
 
 // Helper to normalize company filter for Prisma
 function normalizeCompanyFilter(
-  companyFilter: { companyId: string | null } | { companyId: { in: string[] } }
+  companyFilter: { companyId: string | null } | { companyId: { in: string[] } },
 ): { companyId?: string | { in: string[] } } {
   const cid = companyFilter.companyId;
-  
+
   // Check if it's an OWNER filter with { in: [...] }
   if (cid && typeof cid === "object" && "in" in cid) {
     return { companyId: cid };
   }
-  
+
   // For single company (ADMIN/USER)
   return cid ? { companyId: cid as string } : {};
 }

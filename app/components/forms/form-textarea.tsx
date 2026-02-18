@@ -11,15 +11,34 @@ interface FormTextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaEle
   containerClassName?: string;
 }
 
-export const FormTextarea = React.forwardRef<HTMLTextAreaElement, FormTextareaProps>(
-  ({ label, error, helperText, required, containerClassName, id, name, className, ...props }, ref) => {
+export const FormTextarea = React.forwardRef<
+  HTMLTextAreaElement,
+  FormTextareaProps
+>(
+  (
+    {
+      label,
+      error,
+      helperText,
+      required,
+      containerClassName,
+      id,
+      name,
+      className,
+      ...props
+    },
+    ref,
+  ) => {
     const fieldId = id || name;
     const errorText = Array.isArray(error) ? error[0] : error;
 
     return (
       <div className={cn("space-y-2", containerClassName)}>
         {label && (
-          <Label htmlFor={fieldId} className={cn(errorText && "text-destructive")}>
+          <Label
+            htmlFor={fieldId}
+            className={cn(errorText && "text-destructive")}
+          >
             {label} {required && <span className="text-destructive">*</span>}
           </Label>
         )}
@@ -29,9 +48,15 @@ export const FormTextarea = React.forwardRef<HTMLTextAreaElement, FormTextareaPr
           ref={ref}
           className={cn(
             errorText && "border-destructive focus-visible:ring-destructive",
-            className
+            className,
           )}
-          aria-describedby={errorText ? `${fieldId}-error` : helperText ? `${fieldId}-helper` : undefined}
+          aria-describedby={
+            errorText
+              ? `${fieldId}-error`
+              : helperText
+                ? `${fieldId}-helper`
+                : undefined
+          }
           aria-invalid={!!errorText}
           required={required}
           {...props}
@@ -48,7 +73,7 @@ export const FormTextarea = React.forwardRef<HTMLTextAreaElement, FormTextareaPr
         )}
       </div>
     );
-  }
+  },
 );
 
 FormTextarea.displayName = "FormTextarea";
