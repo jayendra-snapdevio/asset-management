@@ -32,8 +32,6 @@ interface StatusPieChartProps {
   data: StatusData[];
 }
 
-
-
 export function StatusPieChart({ data }: StatusPieChartProps) {
   const chartData = data.map((d) => ({
     ...d,
@@ -68,7 +66,9 @@ export function StatusPieChart({ data }: StatusPieChartProps) {
               cx="50%"
               cy="50%"
               outerRadius={100}
-              label= {({ name, payload }) => `${name}: ${(payload as StatusData)?.percentage ?? 0}%`}
+              label={({ name, payload }) =>
+                `${name}: ${(payload as StatusData)?.percentage ?? 0}%`
+              }
               labelLine={false}
             >
               {chartData.map((entry, index) => (

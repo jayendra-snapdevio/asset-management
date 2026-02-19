@@ -25,7 +25,10 @@ interface ActivityFeedProps {
   noCard?: boolean;
 }
 
-export function ActivityFeed({ activities, noCard = false }: ActivityFeedProps) {
+export function ActivityFeed({
+  activities,
+  noCard = false,
+}: ActivityFeedProps) {
   const getActivityIcon = (status: string) => {
     switch (status) {
       case "ACTIVE":
@@ -84,7 +87,8 @@ export function ActivityFeed({ activities, noCard = false }: ActivityFeedProps) 
             >
               {assetName}
             </Link>{" "}
-            {companyTag} was transferred to <span className="font-medium">{userName}</span>
+            {companyTag} was transferred to{" "}
+            <span className="font-medium">{userName}</span>
           </>
         );
       default:
@@ -119,7 +123,9 @@ export function ActivityFeed({ activities, noCard = false }: ActivityFeedProps) 
   const content = (
     <div className="space-y-4">
       {activities.length === 0 ? (
-        <p className="text-muted-foreground text-center py-8">No recent activity</p>
+        <p className="text-muted-foreground text-center py-8">
+          No recent activity
+        </p>
       ) : (
         <ScrollArea className="h-[300px] pr-4">
           <div className="space-y-4">

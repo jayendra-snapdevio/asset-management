@@ -64,8 +64,9 @@ export function StatCard({
         )}
         {trend && (
           <p
-            className={`text-xs flex items-center gap-1 mt-1 ${trend.isPositive ? "text-green-600" : "text-red-600"
-              }`}
+            className={`text-xs flex items-center gap-1 mt-1 ${
+              trend.isPositive ? "text-green-600" : "text-red-600"
+            }`}
           >
             {trend.isPositive ? (
               <TrendingUp className="h-3 w-3" />

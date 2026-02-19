@@ -10,7 +10,11 @@ import {
 import type { Route } from "./+types/_dashboard.users";
 import { requireRole } from "~/lib/session.server";
 import { handleError, errorResponse } from "~/lib/errors.server";
-import { getUsers, createUser, deleteUser } from "~/services/user.service.server";
+import {
+  getUsers,
+  createUser,
+  deleteUser,
+} from "~/services/user.service.server";
 import { getCompaniesByOwner } from "~/services/company.service.server";
 import { createUserSchema } from "~/validators/user.validator";
 import { prisma } from "~/lib/db.server";
@@ -131,7 +135,10 @@ export async function action({ request }: Route.ActionArgs) {
   if (intent === "delete") {
     const userId = formData.get("userId") as string;
     if (!userId) {
-      return data({ error: "User ID is required", success: false }, { status: 400 });
+      return data(
+        { error: "User ID is required", success: false },
+        { status: 400 },
+      );
     }
     try {
       const result = await deleteUser(userId, user);
@@ -358,13 +365,21 @@ export default function UsersPage({
                     label="First Name"
                     name="firstName"
                     required
-                    error={actionData && "errors" in actionData ? actionData.errors?.firstName : undefined}
+                    error={
+                      actionData && "errors" in actionData
+                        ? actionData.errors?.firstName
+                        : undefined
+                    }
                   />
                   <FormField
                     label="Last Name"
                     name="lastName"
                     required
-                    error={actionData && "errors" in actionData ? actionData.errors?.lastName : undefined}
+                    error={
+                      actionData && "errors" in actionData
+                        ? actionData.errors?.lastName
+                        : undefined
+                    }
                   />
                 </div>
 
@@ -373,13 +388,24 @@ export default function UsersPage({
                   name="email"
                   type="email"
                   required
-                  error={(actionData && "errors" in actionData ? actionData.errors?.email : undefined) || (actionData && "error" in actionData ? actionData.error : undefined)}
+                  error={
+                    (actionData && "errors" in actionData
+                      ? actionData.errors?.email
+                      : undefined) ||
+                    (actionData && "error" in actionData
+                      ? actionData.error
+                      : undefined)
+                  }
                 />
 
                 <PasswordToggleField
                   name="password"
                   label="Password"
-                  errors={actionData && "errors" in actionData ? actionData.errors?.password : undefined}
+                  errors={
+                    actionData && "errors" in actionData
+                      ? actionData.errors?.password
+                      : undefined
+                  }
                 />
 
                 <FormSelect
@@ -389,7 +415,9 @@ export default function UsersPage({
                   options={[
                     { label: "User", value: "USER" },
                     { label: "Admin", value: "ADMIN" },
-                    ...(currentUser.role === "OWNER" ? [{ label: "Owner", value: "OWNER" }] : []),
+                    ...(currentUser.role === "OWNER"
+                      ? [{ label: "Owner", value: "OWNER" }]
+                      : []),
                   ]}
                 />
 
@@ -483,7 +511,11 @@ export default function UsersPage({
               </SelectContent>
             </Select>
             {hasFilters && (
-              <Button variant="ghost" onClick={clearFilters} className="w-full md:w-[140px]">
+              <Button
+                variant="ghost"
+                onClick={clearFilters}
+                className="w-full md:w-[140px]"
+              >
                 Clear filters
               </Button>
             )}
@@ -536,7 +568,10 @@ export default function UsersPage({
                 {typedUsers.map((user) => (
                   <TableRow key={user.id}>
                     <TableCell className="font-medium">
-                      <Link className="hover:underline" to={`/dashboard/users/${user.id}`}>
+                      <Link
+                        className="hover:underline"
+                        to={`/dashboard/users/${user.id}`}
+                      >
                         {user.firstName} {user.lastName}
                       </Link>
                     </TableCell>
@@ -551,12 +586,24 @@ export default function UsersPage({
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-start gap-1">
-                        <Button asChild variant="ghost" size="icon" className="h-8 w-8" title="View details">
+                        <Button
+                          asChild
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          title="View details"
+                        >
                           <Link to={`/dashboard/users/${user.id}`}>
                             <Eye className="h-3 w-3" />
                           </Link>
                         </Button>
-                        <Button asChild variant="ghost" size="icon" className="h-8 w-8" title="Edit user">
+                        <Button
+                          asChild
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          title="Edit user"
+                        >
                           <Link to={`/dashboard/users/${user.id}`}>
                             <Edit2 className="h-3 w-3" />
                           </Link>
@@ -565,7 +612,12 @@ export default function UsersPage({
                         {currentUser.id !== user.id && (
                           <Dialog>
                             <DialogTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" title="Delete user">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                title="Delete user"
+                              >
                                 <Trash2 className="h-3 w-3" />
                               </Button>
                             </DialogTrigger>
@@ -573,19 +625,37 @@ export default function UsersPage({
                               <DialogHeader>
                                 <DialogTitle>Delete User</DialogTitle>
                                 <DialogDescription>
-                                  Are you sure you want to delete {user.firstName} {user.lastName}? This action cannot be undone.
+                                  Are you sure you want to delete{" "}
+                                  {user.firstName} {user.lastName}? This action
+                                  cannot be undone.
                                 </DialogDescription>
                               </DialogHeader>
                               <DialogFooter className="mt-4">
                                 <Form method="post">
-                                  <input type="hidden" name="intent" value="delete" />
-                                  <input type="hidden" name="userId" value={user.id} />
+                                  <input
+                                    type="hidden"
+                                    name="intent"
+                                    value="delete"
+                                  />
+                                  <input
+                                    type="hidden"
+                                    name="userId"
+                                    value={user.id}
+                                  />
                                   <div className="flex gap-2 justify-end">
                                     <DialogTrigger asChild>
-                                      <Button type="button" variant="outline">Cancel</Button>
+                                      <Button type="button" variant="outline">
+                                        Cancel
+                                      </Button>
                                     </DialogTrigger>
-                                    <Button type="submit" variant="destructive" disabled={isSubmitting}>
-                                      {isSubmitting ? "Deleting..." : "Delete User"}
+                                    <Button
+                                      type="submit"
+                                      variant="destructive"
+                                      disabled={isSubmitting}
+                                    >
+                                      {isSubmitting
+                                        ? "Deleting..."
+                                        : "Delete User"}
                                     </Button>
                                   </div>
                                 </Form>

@@ -6,7 +6,10 @@ export const createCompanySchema = z.object({
     .min(1, "Company name is required")
     .min(2, "Name must be at least 2 characters")
     .max(100, "Name must be less than 100 characters"),
-  address: z.string().max(200, "Address must be less than 200 characters").optional(),
+  address: z
+    .string()
+    .max(200, "Address must be less than 200 characters")
+    .optional(),
   phone: z
     .string()
     .max(20, "Phone must be less than 20 characters")
@@ -14,12 +17,11 @@ export const createCompanySchema = z.object({
     .optional()
     .or(z.literal("")),
   email: z.string().email("Invalid email address").optional().or(z.literal("")),
-  website: z
+  website: z.string().url("Invalid website URL").optional().or(z.literal("")),
+  description: z
     .string()
-    .url("Invalid website URL")
-    .optional()
-    .or(z.literal("")),
-  description: z.string().max(500, "Description must be less than 500 characters").optional(),
+    .max(500, "Description must be less than 500 characters")
+    .optional(),
   isActive: z.boolean().default(true),
 });
 

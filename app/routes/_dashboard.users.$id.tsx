@@ -58,7 +58,11 @@ import { formatDate } from "~/lib/date";
 import { SuccessMessage } from "~/components/ui/success-message";
 import type { UserDetail } from "~/types";
 import { OWNERSHIP_TYPE_LABELS } from "~/constants";
-import { Tooltip, TooltipContent, TooltipTrigger } from "~/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "~/components/ui/tooltip";
 
 export function meta({ data }: Route.MetaArgs) {
   const userName = data?.user
@@ -249,17 +253,18 @@ export default function UserDetailPage({
           <div className="flex flex-col gap-2">
             <div className="flex flex-row text-3xl font-bold flex items-center gap-2">
               <User className="h-8 w-8" />
-              <h1> {typedUser.firstName} {typedUser.lastName}</h1>
+              <h1>
+                {" "}
+                {typedUser.firstName} {typedUser.lastName}
+              </h1>
             </div>
             <div className="text-muted-foreground flex items-center gap-2">
-             <Tooltip>
-               <TooltipTrigger asChild>
-                 <button> {getRoleBadge(typedUser.role)}</button>
-               </TooltipTrigger>
-               <TooltipContent>
-                 {typedUser.email}
-               </TooltipContent>
-            </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button> {getRoleBadge(typedUser.role)}</button>
+                </TooltipTrigger>
+                <TooltipContent>{typedUser.email}</TooltipContent>
+              </Tooltip>
               {typedUser.isActive ? (
                 <Badge
                   variant="outline"
@@ -321,7 +326,8 @@ export default function UserDetailPage({
                       <Button
                         className="w-full md:w-[180px]"
                         variant="outline"
-                        onClick={() => setIsResetPasswordOpen(false)}>
+                        onClick={() => setIsResetPasswordOpen(false)}
+                      >
                         Cancel
                       </Button>
                       <Button type="submit" disabled={isSubmitting}>
@@ -354,7 +360,10 @@ export default function UserDetailPage({
                 </Button>
               </Form>
 
-              <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+              <Dialog
+                open={isDeleteDialogOpen}
+                onOpenChange={setIsDeleteDialogOpen}
+              >
                 <DialogTrigger asChild>
                   <Button variant="destructive" className="w-full md:w-[180px]">
                     <UserX className="h-4 w-4 mr-2" />
@@ -369,7 +378,10 @@ export default function UserDetailPage({
                       {typedUser.lastName}? This action cannot be undone.
                     </DialogDescription>
                   </DialogHeader>
-                  <Form method="post" onSubmit={() => setIsDeleteDialogOpen(false)}>
+                  <Form
+                    method="post"
+                    onSubmit={() => setIsDeleteDialogOpen(false)}
+                  >
                     <input type="hidden" name="intent" value="delete" />
                     <DialogFooter>
                       <Button
@@ -379,7 +391,11 @@ export default function UserDetailPage({
                       >
                         Cancel
                       </Button>
-                      <Button type="submit" variant="destructive" disabled={isSubmitting}>
+                      <Button
+                        type="submit"
+                        variant="destructive"
+                        disabled={isSubmitting}
+                      >
                         {isSubmitting ? "Deleting..." : "Delete User"}
                       </Button>
                     </DialogFooter>
@@ -389,7 +405,6 @@ export default function UserDetailPage({
             </>
           )}
         </div>
-
       </div>
 
       {actionData && "success" in actionData && actionData.success && (
@@ -475,7 +490,11 @@ export default function UserDetailPage({
                 name="firstName"
                 defaultValue={typedUser.firstName}
                 disabled={!canModify}
-                error={actionData && "errors" in actionData ? actionData.errors?.firstName : undefined}
+                error={
+                  actionData && "errors" in actionData
+                    ? actionData.errors?.firstName
+                    : undefined
+                }
               />
 
               <FormField
@@ -483,7 +502,11 @@ export default function UserDetailPage({
                 name="lastName"
                 defaultValue={typedUser.lastName}
                 disabled={!canModify}
-                error={actionData && "errors" in actionData ? actionData.errors?.lastName : undefined}
+                error={
+                  actionData && "errors" in actionData
+                    ? actionData.errors?.lastName
+                    : undefined
+                }
               />
 
               <FormField
@@ -492,7 +515,11 @@ export default function UserDetailPage({
                 type="email"
                 defaultValue={typedUser.email}
                 disabled={!canModify}
-                error={actionData && "errors" in actionData ? actionData.errors?.email : undefined}
+                error={
+                  actionData && "errors" in actionData
+                    ? actionData.errors?.email
+                    : undefined
+                }
               />
 
               <FormSelect
@@ -503,7 +530,9 @@ export default function UserDetailPage({
                 options={[
                   { label: "User", value: "USER" },
                   { label: "Admin", value: "ADMIN" },
-                  ...(currentUser.role === "OWNER" ? [{ label: "Owner", value: "OWNER" }] : []),
+                  ...(currentUser.role === "OWNER"
+                    ? [{ label: "Owner", value: "OWNER" }]
+                    : []),
                 ]}
               />
             </div>
@@ -577,14 +606,21 @@ export default function UserDetailPage({
                       <div className="flex flex-col gap-1">
                         {assignment.asset.ownershipType ? (
                           <Badge variant="outline" className="w-fit">
-                            {OWNERSHIP_TYPE_LABELS[assignment.asset.ownershipType as keyof typeof OWNERSHIP_TYPE_LABELS] || assignment.asset.ownershipType}
+                            {OWNERSHIP_TYPE_LABELS[
+                              assignment.asset
+                                .ownershipType as keyof typeof OWNERSHIP_TYPE_LABELS
+                            ] || assignment.asset.ownershipType}
                           </Badge>
-                        ) : "-"}
-                        {assignment.asset.ownershipType === "PRIVATE" && assignment.asset.owner && (
-                          <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                            Owner: {assignment.asset.owner.firstName} {assignment.asset.owner.lastName}
-                          </span>
+                        ) : (
+                          "-"
                         )}
+                        {assignment.asset.ownershipType === "PRIVATE" &&
+                          assignment.asset.owner && (
+                            <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                              Owner: {assignment.asset.owner.firstName}{" "}
+                              {assignment.asset.owner.lastName}
+                            </span>
+                          )}
                       </div>
                     </TableCell>
                     <TableCell>{formatDate(assignment.assignedDate)}</TableCell>
@@ -637,16 +673,12 @@ export default function UserDetailPage({
                         {asset.name}
                       </Link>
                     </TableCell>
-                    <TableCell>
-                      {asset.serialNumber || "-"}
-                    </TableCell>
+                    <TableCell>{asset.serialNumber || "-"}</TableCell>
                     <TableCell className="capitalize">
                       {asset.category || "-"}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="secondary">
-                        {asset.status}
-                      </Badge>
+                      <Badge variant="secondary">{asset.status}</Badge>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -684,7 +716,10 @@ export default function UserDetailPage({
                 {pastAssignments.map((assignment) => (
                   <TableRow key={assignment.id}>
                     <TableCell className="font-medium">
-                      <Link to={`/dashboard/assets/${assignment.asset.id}`} className="hover:underline text-primary">
+                      <Link
+                        to={`/dashboard/assets/${assignment.asset.id}`}
+                        className="hover:underline text-primary"
+                      >
                         {assignment.asset.name}
                       </Link>
                     </TableCell>
@@ -698,14 +733,21 @@ export default function UserDetailPage({
                       <div className="flex flex-col gap-1">
                         {assignment.asset.ownershipType ? (
                           <Badge variant="outline" className="w-fit">
-                            {OWNERSHIP_TYPE_LABELS[assignment.asset.ownershipType as keyof typeof OWNERSHIP_TYPE_LABELS] || assignment.asset.ownershipType}
-                          </Badge>  
-                        ) : "-"}
-                        {assignment.asset.ownershipType === "PRIVATE" && assignment.asset.owner && (
-                          <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                            Owner: {assignment.asset.owner.firstName} {assignment.asset.owner.lastName}
-                          </span>
+                            {OWNERSHIP_TYPE_LABELS[
+                              assignment.asset
+                                .ownershipType as keyof typeof OWNERSHIP_TYPE_LABELS
+                            ] || assignment.asset.ownershipType}
+                          </Badge>
+                        ) : (
+                          "-"
                         )}
+                        {assignment.asset.ownershipType === "PRIVATE" &&
+                          assignment.asset.owner && (
+                            <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                              Owner: {assignment.asset.owner.firstName}{" "}
+                              {assignment.asset.owner.lastName}
+                            </span>
+                          )}
                       </div>
                     </TableCell>
                     <TableCell>{formatDate(assignment.assignedDate)}</TableCell>

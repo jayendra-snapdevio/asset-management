@@ -38,22 +38,23 @@ enum OwnershipType {
 
 // Models
 model User {
-  id               String       @id @default(auto()) @map("_id") @db.ObjectId
-  email            String       @unique
+  id               String         @id @default(auto()) @map("_id") @db.ObjectId
+  email            String         @unique
   password         String
   firstName        String
   lastName         String
-  role             Role         @default(USER)
-  isActive         Boolean      @default(true)
-  companyId        String?      @db.ObjectId
-  company          Company?     @relation(fields: [companyId], references: [id])
-  createdAssets    Asset[]      @relation("CreatedBy")
-  ownedAssets      Asset[]      @relation("AssetOwner")
+  role             Role           @default(USER)
+  isActive         Boolean        @default(true)
+  companyId        String?        @db.ObjectId
+  company          Company?       @relation(fields: [companyId], references: [id])
+  createdAssets    Asset[]        @relation("CreatedBy")
+  ownedAssets      Asset[]        @relation("AssetOwner")
   assignments      Assignment[]
+  assetRequests    AssetRequest[]
   resetToken       String?
   resetTokenExpiry DateTime?
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 }
 
 model Company {
@@ -114,4 +115,24 @@ model Assignment {
   status       AssignmentStatus @default(ACTIVE)
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  FULFILLED
+}
+
+model AssetRequest {
+  id          String        @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String        @db.ObjectId
+  user        User          @relation(fields: [userId], references: [id])
+  assetName   String
+  reason      String?
+  status      RequestStatus @default(PENDING)
+  adminNotes  String?
+  fulfilledAt DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 }

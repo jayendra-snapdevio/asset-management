@@ -1,22 +1,25 @@
-import { clsx, type ClassValue } from "clsx"
-import { twMerge } from "tailwind-merge"
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+  return twMerge(clsx(inputs));
 }
 
 /**
  * Format duration between two dates in a human-readable format
  */
-export function formatDuration(start: Date | string, end: Date | string): string {
+export function formatDuration(
+  start: Date | string,
+  end: Date | string,
+): string {
   const startDate = new Date(start);
   const endDate = new Date(end);
-  
+
   const diffMs = Math.abs(endDate.getTime() - startDate.getTime());
   const diffMinutes = Math.floor(diffMs / (1000 * 60));
   const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  
+
   // Calculate months and years using date arithmetic for accuracy
   const yearsDiff = endDate.getFullYear() - startDate.getFullYear();
   const monthsDiff = endDate.getMonth() - startDate.getMonth();

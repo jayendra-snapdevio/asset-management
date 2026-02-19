@@ -2,9 +2,7 @@ import { Link } from "react-router";
 import { Button } from "~/components/ui/button";
 
 export function meta() {
-  return [
-    { title: "Access Denied - Asset Management" },
-  ];
+  return [{ title: "Access Denied - Asset Management" }];
 }
 
 export default function Unauthorized() {
@@ -14,8 +12,8 @@ export default function Unauthorized() {
         <h1 className="text-6xl font-bold text-destructive">403</h1>
         <h2 className="text-2xl font-semibold">Access Denied</h2>
         <p className="text-muted-foreground max-w-md">
-          You don't have permission to access this resource. 
-          Please contact your administrator if you believe this is a mistake.
+          You don't have permission to access this resource. Please contact your
+          administrator if you believe this is a mistake.
         </p>
         <div className="flex gap-4 justify-center pt-4">
           <Button asChild>

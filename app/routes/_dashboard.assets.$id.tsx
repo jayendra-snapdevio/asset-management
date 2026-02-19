@@ -1,11 +1,22 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { toast } from "sonner";
 import { data, redirect, Form, Link, useNavigation } from "react-router";
 import type { Route } from "./+types/_dashboard.assets.$id";
 // Server-only imports moved to loader/action to avoid Vite leakage
-import type { AssetStatus, AssignmentStatus, OwnershipType } from "@prisma/client";
+import type {
+  AssetStatus,
+  AssignmentStatus,
+  OwnershipType,
+} from "@prisma/client";
 import { updateAssetSchema } from "../validators/asset.validator";
 import { handleError, errorResponse } from "../lib/errors.server";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
 import { FormField } from "~/components/forms/form-field";
@@ -43,7 +54,15 @@ import {
   History,
   Package,
 } from "lucide-react";
-import { ASSET_STATUS_LABELS, ASSET_STATUS_COLORS, ASSET_CATEGORIES, ASSIGNMENT_STATUS_LABELS, ASSIGNMENT_STATUS_COLORS, OWNERSHIP_TYPE_LABELS, OWNERSHIP_TYPE_OPTIONS } from "~/constants";
+import {
+  ASSET_STATUS_LABELS,
+  ASSET_STATUS_COLORS,
+  ASSET_CATEGORIES,
+  ASSIGNMENT_STATUS_LABELS,
+  ASSIGNMENT_STATUS_COLORS,
+  OWNERSHIP_TYPE_LABELS,
+  OWNERSHIP_TYPE_OPTIONS,
+} from "~/constants";
 // getUsers moved to loader
 import { format } from "date-fns";
 import { ImageUpload } from "~/components/assets/ImageUpload";
@@ -59,7 +78,8 @@ export function meta({ data }: Route.MetaArgs) {
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { requireAuth } = await import("../lib/session.server");
-  const { getCompanyFilter } = await import("../services/company.service.server");
+  const { getCompanyFilter } =
+    await import("../services/company.service.server");
   const { getAssetById } = await import("../services/asset.service.server");
   const { getUsers } = await import("../services/user.service.server");
 
@@ -69,7 +89,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const asset = await getAssetById(
     params.id!,
     companyFilter,
-    user.role === "USER" ? user.id : undefined
+    user.role === "USER" ? user.id : undefined,
   );
 
   if (!asset) {
@@ -77,14 +97,18 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   }
 
   const { users } = await getUsers(user, { page: 1, limit: 1000 });
-  const userOptions = users.map(u => ({ label: `${u.firstName} ${u.lastName} (${u.email})`, value: u.id }));
+  const userOptions = users.map((u) => ({
+    label: `${u.firstName} ${u.lastName} (${u.email})`,
+    value: u.id,
+  }));
 
   return { user, asset, userOptions };
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
   const { requireAuth } = await import("../lib/session.server");
-  const { getCompanyFilter } = await import("../services/company.service.server");
+  const { getCompanyFilter } =
+    await import("../services/company.service.server");
   const {
     getAssetById,
     updateAsset,
@@ -93,7 +117,8 @@ export async function action({ request, params }: Route.ActionArgs) {
     regenerateQRCode,
     deleteAssetImage,
   } = await import("../services/asset.service.server");
-  const { returnAssignment } = await import("../services/assignment.service.server");
+  const { returnAssignment } =
+    await import("../services/assignment.service.server");
 
   const user = await requireAuth(request);
   const companyFilter = await getCompanyFilter(user);
@@ -103,7 +128,8 @@ export async function action({ request, params }: Route.ActionArgs) {
     throw redirect("/dashboard/assets");
   }
 
-  const isOwnerOrCreator = asset.ownerId === user.id || asset.createdById === user.id;
+  const isOwnerOrCreator =
+    asset.ownerId === user.id || asset.createdById === user.id;
   const isAdminOrOwner = user.role === "OWNER" || user.role === "ADMIN";
   const canModify = isAdminOrOwner || isOwnerOrCreator;
 
@@ -121,8 +147,12 @@ export async function action({ request, params }: Route.ActionArgs) {
 
     if (!result.success) {
       return data(
-        { errors: result.error.flatten().fieldErrors, error: undefined, success: false },
-        { status: 400 }
+        {
+          errors: result.error.flatten().fieldErrors,
+          error: undefined,
+          success: false,
+        },
+        { status: 400 },
       );
     }
 
@@ -146,7 +176,7 @@ export async function action({ request, params }: Route.ActionArgs) {
           ownerId: result.data.ownerId,
           otherOwnership: result.data.otherOwnership,
         },
-        companyFilter
+        companyFilter,
       );
 
       if (updateResult.error) {
@@ -234,7 +264,10 @@ export async function action({ request, params }: Route.ActionArgs) {
   return null;
 }
 
-export default function AssetDetailPage({ loaderData, actionData }: Route.ComponentProps) {
+export default function AssetDetailPage({
+  loaderData,
+  actionData,
+}: Route.ComponentProps) {
   const { user, asset, userOptions } = loaderData;
   const typedAsset = asset as unknown as AssetDetail;
   const navigation = useNavigation();
@@ -246,17 +279,32 @@ export default function AssetDetailPage({ loaderData, actionData }: Route.Compon
   const [ownershipType, setOwnershipType] = useState(typedAsset.ownershipType);
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
 
+  useEffect(() => {
+    if (actionData) {
+      if ("success" in actionData && actionData.success) {
+        toast.success("Action completed successfully");
+        setIsEditing(false);
+        setReturnDialogOpen(false);
+        setDeleteDialogOpen(false);
+      } else if ("error" in actionData && actionData.error) {
+        toast.error(actionData.error);
+      }
+    }
+  }, [actionData]);
+
   const canEdit =
     user.role === "OWNER" ||
     user.role === "ADMIN" ||
     typedAsset.ownerId === user.id ||
     typedAsset.createdBy?.id === user.id;
-  const activeAssignment = typedAsset.assignments.find((a) => a.status === ("ACTIVE" as AssignmentStatus));
-  const canReturn = activeAssignment && (
-    user.role === "OWNER" ||
-    user.role === "ADMIN" ||
-    activeAssignment.user.id === user.id
+  const activeAssignment = typedAsset.assignments.find(
+    (a) => a.status === ("ACTIVE" as AssignmentStatus),
   );
+  const canReturn =
+    activeAssignment &&
+    (user.role === "OWNER" ||
+      user.role === "ADMIN" ||
+      activeAssignment.user.id === user.id);
 
   const getStatusBadge = (assetStatus: AssetStatus) => {
     return (
@@ -268,7 +316,10 @@ export default function AssetDetailPage({ loaderData, actionData }: Route.Compon
 
   const getAssignmentStatusBadge = (assignmentStatus: AssignmentStatus) => {
     return (
-      <Badge className={ASSIGNMENT_STATUS_COLORS[assignmentStatus]} variant="secondary">
+      <Badge
+        className={ASSIGNMENT_STATUS_COLORS[assignmentStatus]}
+        variant="secondary"
+      >
         {ASSIGNMENT_STATUS_LABELS[assignmentStatus]}
       </Badge>
     );
@@ -302,8 +353,9 @@ export default function AssetDetailPage({ loaderData, actionData }: Route.Compon
           )}
           <div className="flex flex-col">
             <div className="flex items-center gap-3">
-
-              <h1 className="text-2xl md:text-3xl font-bold">{typedAsset.name}</h1>
+              <h1 className="text-2xl md:text-3xl font-bold">
+                {typedAsset.name}
+              </h1>
               {getStatusBadge(typedAsset.status)}
             </div>
             <p className="text-muted-foreground text-sm md:text-base">
@@ -318,7 +370,12 @@ export default function AssetDetailPage({ loaderData, actionData }: Route.Compon
             {typedAsset.status === "RETIRED" ? (
               <Form method="post">
                 <input type="hidden" name="intent" value="restore" />
-                <Button type="submit" variant="outline" className="w-full md:w-[180px]" disabled={isSubmitting}>
+                <Button
+                  type="submit"
+                  variant="outline"
+                  className="w-full md:w-[180px]"
+                  disabled={isSubmitting}
+                >
                   <RotateCcw className="h-4 w-4 mr-2" />
                   Restore Asset
                 </Button>
@@ -343,7 +400,10 @@ export default function AssetDetailPage({ loaderData, actionData }: Route.Compon
                 </Button>
 
                 {canReturn && (
-                  <Dialog open={returnDialogOpen} onOpenChange={setReturnDialogOpen}>
+                  <Dialog
+                    open={returnDialogOpen}
+                    onOpenChange={setReturnDialogOpen}
+                  >
                     <DialogTrigger asChild>
                       <Button variant="outline">
                         <RotateCcw className="h-4 w-4 mr-2" />
@@ -354,18 +414,18 @@ export default function AssetDetailPage({ loaderData, actionData }: Route.Compon
                       <DialogHeader>
                         <DialogTitle>Return Asset</DialogTitle>
                         <DialogDescription>
-                          Mark this asset as returned. It will become available for new assignments.
+                          Mark this asset as returned. It will become available
+                          for new assignments.
                         </DialogDescription>
                       </DialogHeader>
                       <Form method="post" className="space-y-4">
                         <input type="hidden" name="intent" value="return" />
-                        <input type="hidden" name="assignmentId" value={activeAssignment.id} />
-                        {actionData?.error && (
-                          <Alert variant="destructive">
-                            <AlertCircle className="h-4 w-4" />
-                            <AlertDescription>{actionData.error}</AlertDescription>
-                          </Alert>
-                        )}
+                        <input
+                          type="hidden"
+                          name="assignmentId"
+                          value={activeAssignment.id}
+                        />
+
                         <FormTextarea
                           label="Notes (Optional)"
                           name="notes"
@@ -392,7 +452,10 @@ export default function AssetDetailPage({ loaderData, actionData }: Route.Compon
                   </Dialog>
                 )}
 
-                <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <Dialog
+                  open={deleteDialogOpen}
+                  onOpenChange={setDeleteDialogOpen}
+                >
                   <DialogTrigger asChild>
                     <Button variant="destructive">
                       <Trash2 className="h-4 w-4 mr-2" />
@@ -403,23 +466,35 @@ export default function AssetDetailPage({ loaderData, actionData }: Route.Compon
                     <DialogHeader>
                       <DialogTitle>Delete Asset</DialogTitle>
                       <DialogDescription>
-                        Are you sure you want to delete "{typedAsset.name}"? This action can be undone by restoring the asset.
+                        Are you sure you want to delete "{typedAsset.name}"?
+                        This action can be undone by restoring the asset.
                       </DialogDescription>
                     </DialogHeader>
                     {activeAssignment && (
                       <div className="p-3 bg-destructive/10 text-destructive rounded-md text-sm">
                         This asset is currently assigned to{" "}
-                        {activeAssignment.user.firstName} {activeAssignment.user.lastName}.
-                        Please return the asset before deleting.
+                        {activeAssignment.user.firstName}{" "}
+                        {activeAssignment.user.lastName}. Please return the
+                        asset before deleting.
                       </div>
                     )}
                     <DialogFooter>
-                      <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+                      <Button
+                        variant="outline"
+                        onClick={() => setDeleteDialogOpen(false)}
+                      >
                         Cancel
                       </Button>
-                      <Form method="post" onSubmit={() => setDeleteDialogOpen(false)}>
+                      <Form
+                        method="post"
+                        onSubmit={() => setDeleteDialogOpen(false)}
+                      >
                         <input type="hidden" name="intent" value="delete" />
-                        <Button type="submit" variant="destructive" disabled={!!activeAssignment}>
+                        <Button
+                          type="submit"
+                          variant="destructive"
+                          disabled={!!activeAssignment}
+                        >
                           Delete Asset
                         </Button>
                       </Form>
@@ -430,18 +505,7 @@ export default function AssetDetailPage({ loaderData, actionData }: Route.Compon
             )}
           </div>
         )}
-
       </div>
-
-      {/* Error/Success Messages */}
-      {actionData?.error && (
-        <div className="p-3 bg-destructive/10 text-destructive rounded-md text-sm">
-          {actionData.error}
-        </div>
-      )}
-      {actionData && "success" in actionData && actionData.success && (
-        <SuccessMessage message="Asset updated successfully!" />
-      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Info */}
@@ -463,7 +527,11 @@ export default function AssetDetailPage({ loaderData, actionData }: Route.Compon
                     name="name"
                     defaultValue={typedAsset.name}
                     required
-                    error={actionData && "errors" in actionData ? actionData.errors?.name : undefined}
+                    error={
+                      actionData && "errors" in actionData
+                        ? actionData.errors?.name
+                        : undefined
+                    }
                   />
 
                   <FormTextarea
@@ -512,8 +580,15 @@ export default function AssetDetailPage({ loaderData, actionData }: Route.Compon
                       onValueChange={(v) => setStatus(v as AssetStatus)}
                       options={[
                         { label: "Available", value: "AVAILABLE" },
-                        { label: "Assigned", value: "ASSIGNED", disabled: !activeAssignment },
-                        { label: "Under Maintenance", value: "UNDER_MAINTENANCE" },
+                        {
+                          label: "Assigned",
+                          value: "ASSIGNED",
+                          disabled: !activeAssignment,
+                        },
+                        {
+                          label: "Under Maintenance",
+                          value: "UNDER_MAINTENANCE",
+                        },
                         { label: "Retired", value: "RETIRED" },
                       ]}
                     />
@@ -522,7 +597,9 @@ export default function AssetDetailPage({ loaderData, actionData }: Route.Compon
                       label="Ownership Type"
                       name="ownershipType"
                       value={ownershipType}
-                      onValueChange={(v) => setOwnershipType(v as OwnershipType)}
+                      onValueChange={(v) =>
+                        setOwnershipType(v as OwnershipType)
+                      }
                       options={OWNERSHIP_TYPE_OPTIONS}
                     />
                   </div>
@@ -535,7 +612,11 @@ export default function AssetDetailPage({ loaderData, actionData }: Route.Compon
                       placeholder="Select user"
                       required
                       options={userOptions}
-                      error={actionData && "errors" in actionData ? actionData.errors?.ownerId : undefined}
+                      error={
+                        actionData && "errors" in actionData
+                          ? actionData.errors?.ownerId
+                          : undefined
+                      }
                     />
                   )}
 
@@ -546,7 +627,11 @@ export default function AssetDetailPage({ loaderData, actionData }: Route.Compon
                       defaultValue={typedAsset.otherOwnership || ""}
                       placeholder="e.g., Leased from Company X"
                       required
-                      error={actionData && "errors" in actionData ? actionData.errors?.otherOwnership : undefined}
+                      error={
+                        actionData && "errors" in actionData
+                          ? actionData.errors?.otherOwnership
+                          : undefined
+                      }
                     />
                   )}
 
@@ -565,7 +650,10 @@ export default function AssetDetailPage({ loaderData, actionData }: Route.Compon
                       type="date"
                       defaultValue={
                         typedAsset.purchaseDate
-                          ? format(new Date(typedAsset.purchaseDate), "yyyy-MM-dd")
+                          ? format(
+                              new Date(typedAsset.purchaseDate),
+                              "yyyy-MM-dd",
+                            )
                           : ""
                       }
                     />
@@ -615,11 +703,15 @@ export default function AssetDetailPage({ loaderData, actionData }: Route.Compon
                 <dl className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <dt className="text-muted-foreground">Description</dt>
-                    <dd className="font-medium">{typedAsset.description || "—"}</dd>
+                    <dd className="font-medium">
+                      {typedAsset.description || "—"}
+                    </dd>
                   </div>
                   <div>
                     <dt className="text-muted-foreground">Serial Number</dt>
-                    <dd className="font-medium">{typedAsset.serialNumber || "—"}</dd>
+                    <dd className="font-medium">
+                      {typedAsset.serialNumber || "—"}
+                    </dd>
                   </div>
                   <div>
                     <dt className="text-muted-foreground">Model</dt>
@@ -627,37 +719,49 @@ export default function AssetDetailPage({ loaderData, actionData }: Route.Compon
                   </div>
                   <div>
                     <dt className="text-muted-foreground">Manufacturer</dt>
-                    <dd className="font-medium">{typedAsset.manufacturer || "—"}</dd>
+                    <dd className="font-medium">
+                      {typedAsset.manufacturer || "—"}
+                    </dd>
                   </div>
                   <div>
                     <dt className="text-muted-foreground">Location</dt>
-                    <dd className="font-medium">{typedAsset.location || "—"}</dd>
+                    <dd className="font-medium">
+                      {typedAsset.location || "—"}
+                    </dd>
                   </div>
                   <div>
                     <dt className="text-muted-foreground">Company</dt>
-                    <dd className="font-medium">{typedAsset.company?.name || "—"}</dd>
+                    <dd className="font-medium">
+                      {typedAsset.company?.name || "—"}
+                    </dd>
                   </div>
                   <div>
                     <dt className="text-muted-foreground">Ownership Type</dt>
                     <dd className="font-medium">
                       {OWNERSHIP_TYPE_LABELS[typedAsset.ownershipType] || "—"}
-                      {typedAsset.ownershipType === "PRIVATE" && typedAsset.owner && (
-                        <span className="text-muted-foreground block text-xs">
-                          Owner: {typedAsset.owner.firstName} {typedAsset.owner.lastName}
-                        </span>
-                      )}
-                      {typedAsset.ownershipType === "OTHER" && typedAsset.otherOwnership && (
-                        <span className="text-muted-foreground block text-xs">
-                          {typedAsset.otherOwnership}
-                        </span>
-                      )}
+                      {typedAsset.ownershipType === "PRIVATE" &&
+                        typedAsset.owner && (
+                          <span className="text-muted-foreground block text-xs">
+                            Owner: {typedAsset.owner.firstName}{" "}
+                            {typedAsset.owner.lastName}
+                          </span>
+                        )}
+                      {typedAsset.ownershipType === "OTHER" &&
+                        typedAsset.otherOwnership && (
+                          <span className="text-muted-foreground block text-xs">
+                            {typedAsset.otherOwnership}
+                          </span>
+                        )}
                     </dd>
                   </div>
                   <div>
                     <dt className="text-muted-foreground">Purchase Date</dt>
                     <dd className="font-medium">
                       {typedAsset.purchaseDate
-                        ? format(new Date(typedAsset.purchaseDate), "MMM d, yyyy")
+                        ? format(
+                            new Date(typedAsset.purchaseDate),
+                            "MMM d, yyyy",
+                          )
                         : "—"}
                     </dd>
                   </div>
@@ -683,7 +787,11 @@ export default function AssetDetailPage({ loaderData, actionData }: Route.Compon
                       {typedAsset.tags.length > 0 ? (
                         <div className="flex flex-wrap gap-1">
                           {typedAsset.tags.map((tag: string) => (
-                            <Badge key={tag} variant="outline" className="text-xs">
+                            <Badge
+                              key={tag}
+                              variant="outline"
+                              className="text-xs"
+                            >
                               {tag}
                             </Badge>
                           ))}
@@ -704,7 +812,10 @@ export default function AssetDetailPage({ loaderData, actionData }: Route.Compon
                   <div>
                     <dt className="text-muted-foreground">Last Updated</dt>
                     <dd className="font-medium">
-                      {format(new Date(typedAsset.updatedAt), "MMM d, yyyy HH:mm")}
+                      {format(
+                        new Date(typedAsset.updatedAt),
+                        "MMM d, yyyy HH:mm",
+                      )}
                     </dd>
                   </div>
                 </dl>
@@ -746,24 +857,37 @@ export default function AssetDetailPage({ loaderData, actionData }: Route.Compon
                         <TableCell className="font-medium">
                           <div className="flex items-center gap-2">
                             <User className="h-4 w-4 text-muted-foreground" />
-                            {assignment.user.firstName} {assignment.user.lastName}
+                            {assignment.user.firstName}{" "}
+                            {assignment.user.lastName}
                           </div>
                         </TableCell>
                         <TableCell>
                           {getAssignmentStatusBadge(assignment.status)}
                         </TableCell>
                         <TableCell>
-                          {format(new Date(assignment.assignedDate), "MMM d, yyyy")}
+                          {format(
+                            new Date(assignment.assignedDate),
+                            "MMM d, yyyy",
+                          )}
                         </TableCell>
                         <TableCell>
                           {assignment.returnDate
-                            ? format(new Date(assignment.returnDate), "MMM d, yyyy")
+                            ? format(
+                                new Date(assignment.returnDate),
+                                "MMM d, yyyy",
+                              )
                             : "—"}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {assignment.returnDate
-                            ? formatDuration(assignment.assignedDate, assignment.returnDate)
-                            : formatDuration(assignment.assignedDate, new Date()) + " (ongoing)"}
+                            ? formatDuration(
+                                assignment.assignedDate,
+                                assignment.returnDate,
+                              )
+                            : formatDuration(
+                                assignment.assignedDate,
+                                new Date(),
+                              ) + " (ongoing)"}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {assignment.notes || "—"}
@@ -805,13 +929,18 @@ export default function AssetDetailPage({ loaderData, actionData }: Route.Compon
                   </div>
                   <div>
                     <p className="font-medium">
-                      {activeAssignment.user.firstName} {activeAssignment.user.lastName}
+                      {activeAssignment.user.firstName}{" "}
+                      {activeAssignment.user.lastName}
                     </p>
                     <p className="text-sm text-muted-foreground">
                       {activeAssignment.user.email}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Since {format(new Date(activeAssignment.assignedDate), "MMM d, yyyy")}
+                      Since{" "}
+                      {format(
+                        new Date(activeAssignment.assignedDate),
+                        "MMM d, yyyy",
+                      )}
                     </p>
                   </div>
                 </div>
@@ -839,14 +968,27 @@ export default function AssetDetailPage({ loaderData, actionData }: Route.Compon
                     className="w-48 h-48 border rounded-md"
                   />
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={handleDownloadQR}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleDownloadQR}
+                    >
                       <Download className="h-4 w-4 mr-2" />
                       Download
                     </Button>
                     {canEdit && (
                       <Form method="post">
-                        <input type="hidden" name="intent" value="regenerate-qr" />
-                        <Button type="submit" variant="outline" size="sm" disabled={isSubmitting}>
+                        <input
+                          type="hidden"
+                          name="intent"
+                          value="regenerate-qr"
+                        />
+                        <Button
+                          type="submit"
+                          variant="outline"
+                          size="sm"
+                          disabled={isSubmitting}
+                        >
                           <RotateCcw className="h-4 w-4 mr-2" />
                           Regenerate
                         </Button>
@@ -861,8 +1003,17 @@ export default function AssetDetailPage({ loaderData, actionData }: Route.Compon
                   </div>
                   {canEdit && (
                     <Form method="post">
-                      <input type="hidden" name="intent" value="regenerate-qr" />
-                      <Button type="submit" variant="outline" size="sm" disabled={isSubmitting}>
+                      <input
+                        type="hidden"
+                        name="intent"
+                        value="regenerate-qr"
+                      />
+                      <Button
+                        type="submit"
+                        variant="outline"
+                        size="sm"
+                        disabled={isSubmitting}
+                      >
                         Generate QR Code
                       </Button>
                     </Form>

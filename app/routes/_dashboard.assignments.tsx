@@ -2,7 +2,10 @@ import { data, Form, Link, useNavigation, useSearchParams } from "react-router";
 import type { Route } from "./+types/_dashboard.assignments";
 import { requireRole } from "~/lib/session.server";
 import { getCompanyFilter } from "~/services/company.service.server";
-import { getAssignments, deleteAssignment } from "~/services/assignment.service.server";
+import {
+  getAssignments,
+  deleteAssignment,
+} from "~/services/assignment.service.server";
 import {
   Card,
   CardContent,
@@ -73,7 +76,9 @@ export async function loader({ request }: Route.LoaderArgs) {
   );
 
   return {
-    user, assignments, pagination,
+    user,
+    assignments,
+    pagination,
   };
 }
 
@@ -86,7 +91,10 @@ export async function action({ request }: Route.ActionArgs) {
   if (intent === "delete") {
     const assignmentId = formData.get("assignmentId") as string;
     if (!assignmentId) {
-      return data({ error: "Assignment ID is required", success: false }, { status: 400 });
+      return data(
+        { error: "Assignment ID is required", success: false },
+        { status: 400 },
+      );
     }
 
     try {
@@ -94,10 +102,16 @@ export async function action({ request }: Route.ActionArgs) {
       if (result.error) {
         return data({ error: result.error, success: false }, { status: 400 });
       }
-      return data({ success: true, message: "Assignment deleted successfully" });
+      return data({
+        success: true,
+        message: "Assignment deleted successfully",
+      });
     } catch (error) {
       console.error("Delete assignment error:", error);
-      return data({ error: "Failed to delete assignment", success: false }, { status: 500 });
+      return data(
+        { error: "Failed to delete assignment", success: false },
+        { status: 500 },
+      );
     }
   }
 
@@ -128,7 +142,10 @@ function formatDate(date: string | Date | null) {
   });
 }
 
-export default function AssignmentsPage({ loaderData, actionData }: Route.ComponentProps) {
+export default function AssignmentsPage({
+  loaderData,
+  actionData,
+}: Route.ComponentProps) {
   const { user, assignments, pagination } = loaderData;
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
@@ -187,7 +204,9 @@ export default function AssignmentsPage({ loaderData, actionData }: Route.Compon
       )}
       {actionData && "success" in actionData && actionData.success && (
         <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-md">
-          {"message" in actionData ? (actionData.message as string) : "Action completed successfully"}
+          {"message" in actionData
+            ? (actionData.message as string)
+            : "Action completed successfully"}
         </div>
       )}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -195,7 +214,13 @@ export default function AssignmentsPage({ loaderData, actionData }: Route.Compon
           <h1 className="text-3xl font-bold">Assignments</h1>
           <p className="text-muted-foreground">Manage asset assignments</p>
         </div>
-        <Link to={canManageAssignments ? "/dashboard/assignments/new" : "/dashboard/user/assignments/new"}>
+        <Link
+          to={
+            canManageAssignments
+              ? "/dashboard/assignments/new"
+              : "/dashboard/user/assignments/new"
+          }
+        >
           <Button className="w-full md:w-[180px]">
             <Plus className="h-4 w-4 mr-2" />
             New Assignment
@@ -356,7 +381,13 @@ export default function AssignmentsPage({ loaderData, actionData }: Route.Compon
                     <TableCell>{formatDate(assignment.returnDate)}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-start gap-1">
-                        <Button asChild variant="ghost" size="icon" className="h-8 w-8" title="View details">
+                        <Button
+                          asChild
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          title="View details"
+                        >
                           <Link to={`/dashboard/assignments/${assignment.id}`}>
                             <Eye className="h-3 w-3" />
                           </Link>
@@ -364,15 +395,28 @@ export default function AssignmentsPage({ loaderData, actionData }: Route.Compon
 
                         {canManageAssignments && (
                           <>
-                            <Button asChild variant="ghost" size="icon" className="h-8 w-8" title="Edit assignment">
-                              <Link to={`/dashboard/assignments/${assignment.id}`}>
+                            <Button
+                              asChild
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              title="Edit assignment"
+                            >
+                              <Link
+                                to={`/dashboard/assignments/${assignment.id}`}
+                              >
                                 <Edit2 className="h-3 w-3" />
                               </Link>
                             </Button>
 
                             <Dialog>
                               <DialogTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" title="Delete assignment">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  title="Delete assignment"
+                                >
                                   <Trash2 className="h-3 w-3" />
                                 </Button>
                               </DialogTrigger>
@@ -380,21 +424,39 @@ export default function AssignmentsPage({ loaderData, actionData }: Route.Compon
                                 <DialogHeader>
                                   <DialogTitle>Delete Assignment</DialogTitle>
                                   <DialogDescription>
-                                    Are you sure you want to delete this assignment for {assignment.asset.name}?
-                                    {assignment.status === "ACTIVE" && " This will return the asset status to AVAILABLE."}
+                                    Are you sure you want to delete this
+                                    assignment for {assignment.asset.name}?
+                                    {assignment.status === "ACTIVE" &&
+                                      " This will return the asset status to AVAILABLE."}
                                     This action cannot be undone.
                                   </DialogDescription>
                                 </DialogHeader>
                                 <DialogFooter className="mt-4">
                                   <Form method="post">
-                                    <input type="hidden" name="intent" value="delete" />
-                                    <input type="hidden" name="assignmentId" value={assignment.id} />
+                                    <input
+                                      type="hidden"
+                                      name="intent"
+                                      value="delete"
+                                    />
+                                    <input
+                                      type="hidden"
+                                      name="assignmentId"
+                                      value={assignment.id}
+                                    />
                                     <div className="flex gap-2 justify-end">
                                       <DialogTrigger asChild>
-                                        <Button type="button" variant="outline">Cancel</Button>
+                                        <Button type="button" variant="outline">
+                                          Cancel
+                                        </Button>
                                       </DialogTrigger>
-                                      <Button type="submit" variant="destructive" disabled={isSubmitting}>
-                                        {isSubmitting ? "Deleting..." : "Delete Assignment"}
+                                      <Button
+                                        type="submit"
+                                        variant="destructive"
+                                        disabled={isSubmitting}
+                                      >
+                                        {isSubmitting
+                                          ? "Deleting..."
+                                          : "Delete Assignment"}
                                       </Button>
                                     </div>
                                   </Form>

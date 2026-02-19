@@ -132,7 +132,11 @@ export default function LoginPage({ actionData }: Route.ComponentProps) {
             error={errors?.email}
           />
 
-          <PasswordToggleField name="password" label="Password" errors={errors?.password} />
+          <PasswordToggleField
+            name="password"
+            label="Password"
+            errors={errors?.password}
+          />
 
           <div className="flex justify-end">
             <Link

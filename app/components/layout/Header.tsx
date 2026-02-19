@@ -12,7 +12,13 @@ import {
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { Badge } from "~/components/ui/badge";
-import { LogOut, Settings, User as UserIcon, Menu, Package } from "lucide-react";
+import {
+  LogOut,
+  Settings,
+  User as UserIcon,
+  Menu,
+  Package,
+} from "lucide-react";
 import { SidebarContent } from "./Sidebar";
 import {
   Sheet,
@@ -64,7 +70,13 @@ export function Header({ user }: HeaderProps) {
       </div>
 
       <div className="flex items-center gap-2 sm:gap-4">
-        <Badge className={cn("hidden sm:inline-flex", roleColors[user.role as keyof typeof roleColors])} variant="secondary">
+        <Badge
+          className={cn(
+            "hidden sm:inline-flex",
+            roleColors[user.role as keyof typeof roleColors],
+          )}
+          variant="secondary"
+        >
           {user.role}
         </Badge>
 

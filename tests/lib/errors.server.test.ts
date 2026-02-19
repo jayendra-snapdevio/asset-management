@@ -1,34 +1,42 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { handlePrismaError, errorResponse, handleError, AppError } from "~/lib/errors.server";
+import {
+  handlePrismaError,
+  errorResponse,
+  handleError,
+  AppError,
+} from "~/lib/errors.server";
 import { Prisma } from "@prisma/client";
 
 describe("errorResponse", () => {
   it("should create error response with default status", () => {
     const response = errorResponse("Something went wrong");
-    
+
     expect(response.init?.status).toBe(400);
   });
 
   it("should create error response with custom status", () => {
     const response = errorResponse("Not found", 404);
-    
+
     expect(response.init?.status).toBe(404);
   });
 
   it("should include error code if provided", () => {
     const response = errorResponse("Duplicate entry", 409, "DUPLICATE");
-    
+
     expect(response.init?.status).toBe(409);
   });
 });
 
 describe("handlePrismaError", () => {
   it("should handle unique constraint violation (P2002)", () => {
-    const error = new Prisma.PrismaClientKnownRequestError("Unique constraint", {
-      code: "P2002",
-      clientVersion: "5.0.0",
-      meta: { target: ["email"] },
-    });
+    const error = new Prisma.PrismaClientKnownRequestError(
+      "Unique constraint",
+      {
+        code: "P2002",
+        clientVersion: "5.0.0",
+        meta: { target: ["email"] },
+      },
+    );
 
     const response = handlePrismaError(error);
 

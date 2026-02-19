@@ -4,7 +4,7 @@ import { prisma } from "./db.server";
 import type { User, Role } from "@prisma/client";
 
 const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || "fallback-secret-key-change-in-production"
+  process.env.JWT_SECRET || "fallback-secret-key-change-in-production",
 );
 
 const SESSION_EXPIRY = "7d";
@@ -28,7 +28,7 @@ export async function hashPassword(password: string): Promise<string> {
  */
 export async function verifyPassword(
   password: string,
-  hash: string
+  hash: string,
 ): Promise<boolean> {
   return bcrypt.compare(password, hash);
 }
@@ -66,9 +66,7 @@ export async function verifyToken(token: string): Promise<JWTPayload | null> {
 /**
  * Get user from token payload
  */
-export async function getUserFromToken(
-  token: string
-): Promise<User | null> {
+export async function getUserFromToken(token: string): Promise<User | null> {
   const payload = await verifyToken(token);
   if (!payload) return null;
 

@@ -19,7 +19,7 @@ export interface PaginationResult {
  */
 export async function getCompaniesByOwner(
   ownerId: string,
-  { page, limit, search }: PaginationParams
+  { page, limit, search }: PaginationParams,
 ) {
   const where: Prisma.CompanyWhereInput = {
     ownerId,
@@ -106,7 +106,7 @@ export async function createCompany(
     website?: string;
     description?: string;
   },
-  ownerId: string
+  ownerId: string,
 ) {
   return prisma.company.create({
     data: {
@@ -135,7 +135,7 @@ export async function updateCompany(
     email?: string;
     website?: string;
     description?: string;
-  }
+  },
 ) {
   // Verify ownership first
   const company = await prisma.company.findFirst({
@@ -211,7 +211,7 @@ export async function getCompanyFilter(user: {
 export async function addAdminToCompany(
   companyId: string,
   ownerId: string,
-  userEmail: string
+  userEmail: string,
 ) {
   // Verify ownership
   const company = await prisma.company.findFirst({
@@ -268,7 +268,7 @@ export async function addAdminToCompany(
 export async function removeAdminFromCompany(
   companyId: string,
   ownerId: string,
-  userId: string
+  userId: string,
 ) {
   // Verify ownership
   const company = await prisma.company.findFirst({

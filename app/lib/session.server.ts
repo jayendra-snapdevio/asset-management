@@ -112,6 +112,13 @@ export async function requireMinimumRole(
 }
 
 /**
+ * Require ADMIN or OWNER role
+ */
+export async function requireAdmin(request: Request): Promise<User> {
+  return requireMinimumRole(request, "ADMIN");
+}
+
+/**
  * Check if user is authenticated without throwing
  */
 export async function isAuthenticated(request: Request): Promise<boolean> {

@@ -1,4 +1,9 @@
-import type { Role, AssetStatus, AssignmentStatus, OwnershipType } from "@prisma/client";
+import type {
+  Role,
+  AssetStatus,
+  AssignmentStatus,
+  OwnershipType,
+} from "@prisma/client";
 import type { SelectOption } from "~/types";
 
 // Ownership type labels and options
@@ -97,10 +102,30 @@ export interface NavItem {
 
 export const DASHBOARD_NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: "LayoutDashboard" },
-  { label: "Assets", href: "/dashboard/assets", icon: "Package", roles: ["OWNER", "ADMIN", "USER"] },
-  { label: "Users", href: "/dashboard/users", icon: "Users", roles: ["OWNER", "ADMIN"] },
-  { label: "Companies", href: "/dashboard/companies", icon: "Building2", roles: ["OWNER"] },
-  { label: "Assignments", href: "/dashboard/assignments", icon: "ClipboardList", roles: ["OWNER", "ADMIN"] },
+  {
+    label: "Assets",
+    href: "/dashboard/assets",
+    icon: "Package",
+    roles: ["OWNER", "ADMIN", "USER"],
+  },
+  {
+    label: "Users",
+    href: "/dashboard/users",
+    icon: "Users",
+    roles: ["OWNER", "ADMIN"],
+  },
+  {
+    label: "Companies",
+    href: "/dashboard/companies",
+    icon: "Building2",
+    roles: ["OWNER"],
+  },
+  {
+    label: "Assignments",
+    href: "/dashboard/assignments",
+    icon: "ClipboardList",
+    roles: ["OWNER", "ADMIN"],
+  },
   { label: "My Assets", href: "/dashboard/my-assets", icon: "Laptop" },
   { label: "Profile", href: "/dashboard/profile", icon: "User" },
 ];

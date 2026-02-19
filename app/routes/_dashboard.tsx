@@ -14,7 +14,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 export default function DashboardLayout({ loaderData }: Route.ComponentProps) {
   const { user } = loaderData;
-  
+
   return (
     <div className="md:flex md:h-screen bg-background">
       <Sidebar user={user} />
@@ -71,7 +71,9 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
         <h1 className="text-4xl font-bold text-destructive">Oops!</h1>
         <h2 className="text-2xl font-semibold">Something went wrong</h2>
         <p className="text-muted-foreground">
-          {error instanceof Error ? error.message : "An unexpected error occurred."}
+          {error instanceof Error
+            ? error.message
+            : "An unexpected error occurred."}
         </p>
         <Button asChild>
           <Link to="/dashboard">Return to Dashboard</Link>

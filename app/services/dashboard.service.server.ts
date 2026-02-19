@@ -53,13 +53,14 @@ export async function getAdminDashboard(user: {
   companyId: string | null;
 }) {
   const companyFilter = await getCompanyFilter(user);
-  
+
   // Build asset filter - handle the case when companyId might be null
-  const assetWhere = user.role === "OWNER" 
-    ? companyFilter 
-    : user.companyId 
-      ? { companyId: user.companyId }
-      : {};
+  const assetWhere =
+    user.role === "OWNER"
+      ? companyFilter
+      : user.companyId
+        ? { companyId: user.companyId }
+        : {};
 
   const [
     totalAssets,
@@ -103,70 +104,72 @@ export async function getAdminDashboard(user: {
     }),
 
     // Recent activity (assignments)
-    prisma.assignment.findMany({
-      where: {
-        asset: assetWhere
-      },
-      orderBy: { createdAt: "desc" },
-      take: 10,
-      select: {
-        id: true,
-        status: true,
-        assignedDate: true,
-        returnDate: true,
-        assetId: true,
-        userId: true,
-      },
-    }).then(async (assignments) => {
-      // Get valid user and asset IDs
-      const userIds = [...new Set(assignments.map(a => a.userId))];
-      const assetIds = [...new Set(assignments.map(a => a.assetId))];
-      
-      const [users, assets] = await Promise.all([
-        prisma.user.findMany({
-          where: { id: { in: userIds } },
-          select: { id: true, firstName: true, lastName: true },
-        }),
-        prisma.asset.findMany({
-          where: { id: { in: assetIds } },
-          select: { 
-            id: true, 
-            name: true,
-            company: {
-              select: { name: true }
-            }
-          },
-        }),
-      ]);
-      
-      const userMap = new Map(users.map(u => [u.id, u]));
-      const assetMap = new Map(assets.map(a => [a.id, a]));
-      
-      // Filter and map assignments with valid relations
-      return assignments
-        .filter(a => userMap.has(a.userId) && assetMap.has(a.assetId))
-        .map(a => {
-          const asset = assetMap.get(a.assetId)!;
-          return {
-            id: a.id,
-            status: a.status,
-            assignedDate: a.assignedDate,
-            returnDate: a.returnDate,
-            user: userMap.get(a.userId)!,
-            asset: {
-              id: asset.id,
-              name: asset.name,
-              companyName: asset.company?.name
+    prisma.assignment
+      .findMany({
+        where: {
+          asset: assetWhere,
+        },
+        orderBy: { createdAt: "desc" },
+        take: 10,
+        select: {
+          id: true,
+          status: true,
+          assignedDate: true,
+          returnDate: true,
+          assetId: true,
+          userId: true,
+        },
+      })
+      .then(async (assignments) => {
+        // Get valid user and asset IDs
+        const userIds = [...new Set(assignments.map((a) => a.userId))];
+        const assetIds = [...new Set(assignments.map((a) => a.assetId))];
+
+        const [users, assets] = await Promise.all([
+          prisma.user.findMany({
+            where: { id: { in: userIds } },
+            select: { id: true, firstName: true, lastName: true },
+          }),
+          prisma.asset.findMany({
+            where: { id: { in: assetIds } },
+            select: {
+              id: true,
+              name: true,
+              company: {
+                select: { name: true },
+              },
             },
-          };
-        });
-    }),
+          }),
+        ]);
+
+        const userMap = new Map(users.map((u) => [u.id, u]));
+        const assetMap = new Map(assets.map((a) => [a.id, a]));
+
+        // Filter and map assignments with valid relations
+        return assignments
+          .filter((a) => userMap.has(a.userId) && assetMap.has(a.assetId))
+          .map((a) => {
+            const asset = assetMap.get(a.assetId)!;
+            return {
+              id: a.id,
+              status: a.status,
+              assignedDate: a.assignedDate,
+              returnDate: a.returnDate,
+              user: userMap.get(a.userId)!,
+              asset: {
+                id: asset.id,
+                name: asset.name,
+                companyName: asset.company?.name,
+              },
+            };
+          });
+      }),
 
     // User count - handle companyId null case
-    prisma.user.count({ 
-      where: user.companyId 
-        ? { companyId: user.companyId, isActive: true } 
-        : { isActive: true } 
+    prisma.user.count({
+      where: user.companyId
+        ? { companyId: user.companyId, isActive: true }
+        : { isActive: true },
     }),
   ]);
 
@@ -189,14 +192,16 @@ export async function getAdminDashboard(user: {
     status: s.status,
     count: s._count as number,
     percentage:
-      totalAssets > 0 ? Math.round(((s._count as number) / totalAssets) * 100) : 0,
+      totalAssets > 0
+        ? Math.round(((s._count as number) / totalAssets) * 100)
+        : 0,
   }));
 
   const categoryDistribution: CategoryDistribution[] = categoryCounts.map(
     (c) => ({
       category: c.category,
       count: c._count as number,
-    })
+    }),
   );
 
   return {
@@ -213,7 +218,13 @@ export async function getAdminDashboard(user: {
  */
 export async function getUserDashboard(userId: string) {
   // Get assignments first, then filter by valid assets
-  const [allActiveAssignments, allHistory, totalAssigned, totalReturned, ownedAssets] = await Promise.all([
+  const [
+    allActiveAssignments,
+    allHistory,
+    totalAssigned,
+    totalReturned,
+    ownedAssets,
+  ] = await Promise.all([
     prisma.assignment.findMany({
       where: { userId, status: "ACTIVE" },
       select: {
@@ -253,10 +264,12 @@ export async function getUserDashboard(userId: string) {
   ]);
 
   // Get all unique asset IDs
-  const allAssetIds = [...new Set([
-    ...allActiveAssignments.map(a => a.assetId),
-    ...allHistory.map(a => a.assetId),
-  ])];
+  const allAssetIds = [
+    ...new Set([
+      ...allActiveAssignments.map((a) => a.assetId),
+      ...allHistory.map((a) => a.assetId),
+    ]),
+  ];
 
   // Fetch valid assets
   const assets = await prisma.asset.findMany({
@@ -269,12 +282,12 @@ export async function getUserDashboard(userId: string) {
       status: true,
     },
   });
-  const assetMap = new Map(assets.map(a => [a.id, a]));
+  const assetMap = new Map(assets.map((a) => [a.id, a]));
 
   // Filter and map assignments with valid assets
   const myAssets = allActiveAssignments
-    .filter(a => assetMap.has(a.assetId))
-    .map(a => ({
+    .filter((a) => assetMap.has(a.assetId))
+    .map((a) => ({
       id: a.id,
       assignedDate: a.assignedDate,
       status: a.status,
@@ -282,9 +295,9 @@ export async function getUserDashboard(userId: string) {
     }));
 
   const history = allHistory
-    .filter(a => assetMap.has(a.assetId))
+    .filter((a) => assetMap.has(a.assetId))
     .slice(0, 10)
-    .map(a => ({
+    .map((a) => ({
       id: a.id,
       assignedDate: a.assignedDate,
       returnDate: a.returnDate,

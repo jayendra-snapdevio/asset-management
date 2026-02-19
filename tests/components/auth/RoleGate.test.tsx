@@ -23,7 +23,7 @@ describe("RoleGate Component", () => {
     render(
       <RoleGate allowedRoles={["ADMIN"]}>
         <div data-testid="admin-content">Admin Content</div>
-      </RoleGate>
+      </RoleGate>,
     );
 
     expect(screen.getByTestId("admin-content")).toBeInTheDocument();
@@ -42,7 +42,7 @@ describe("RoleGate Component", () => {
     render(
       <RoleGate allowedRoles={["ADMIN"]}>
         <div data-testid="admin-content">Admin Content</div>
-      </RoleGate>
+      </RoleGate>,
     );
 
     expect(screen.queryByTestId("admin-content")).not.toBeInTheDocument();
@@ -64,7 +64,7 @@ describe("RoleGate Component", () => {
         fallback={<div data-testid="fallback">Access Denied</div>}
       >
         <div data-testid="admin-content">Admin Content</div>
-      </RoleGate>
+      </RoleGate>,
     );
 
     expect(screen.queryByTestId("admin-content")).not.toBeInTheDocument();
@@ -84,7 +84,7 @@ describe("RoleGate Component", () => {
     render(
       <RoleGate allowedRoles={["ADMIN", "OWNER"]}>
         <div data-testid="content">Protected Content</div>
-      </RoleGate>
+      </RoleGate>,
     );
 
     expect(screen.getByTestId("content")).toBeInTheDocument();

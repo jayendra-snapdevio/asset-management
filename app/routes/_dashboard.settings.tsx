@@ -4,7 +4,13 @@ import { requireRole } from "~/lib/session.server";
 import { prisma } from "~/lib/db.server";
 import { handleError, errorResponse } from "~/lib/errors.server";
 import { updateCompanySchema } from "~/validators/company.validator";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { FormField } from "~/components/forms/form-field";
 import { FormTextarea } from "~/components/forms/form-textarea";
@@ -63,12 +69,15 @@ export async function action({ request }: Route.ActionArgs) {
         headers: {
           "Set-Cookie": await setTheme(theme),
         },
-      }
+      },
     );
   }
 
   if (user.role === "USER") {
-    return errorResponse("You don't have permission to update company settings", 403);
+    return errorResponse(
+      "You don't have permission to update company settings",
+      403,
+    );
   }
 
   if (!user.companyId) {
@@ -84,7 +93,7 @@ export async function action({ request }: Route.ActionArgs) {
   if (!result.success) {
     return data(
       { errors: result.error.flatten().fieldErrors, success: false },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -107,7 +116,10 @@ export async function action({ request }: Route.ActionArgs) {
   }
 }
 
-export default function SettingsPage({ loaderData, actionData }: Route.ComponentProps) {
+export default function SettingsPage({
+  loaderData,
+  actionData,
+}: Route.ComponentProps) {
   const { user, company, theme } = loaderData;
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
@@ -125,7 +137,9 @@ export default function SettingsPage({ loaderData, actionData }: Route.Component
           <Settings className="h-8 w-8" />
           Settings
         </h1>
-        <p className="text-muted-foreground">Manage your application preferences and company settings</p>
+        <p className="text-muted-foreground">
+          Manage your application preferences and company settings
+        </p>
       </div>
 
       {/* Success/Error Messages */}
@@ -167,12 +181,18 @@ export default function SettingsPage({ loaderData, actionData }: Route.Component
                       : "border-border bg-card"
                   }`}
                 >
-                  <t.icon className={`h-8 w-8 mb-2 ${theme === t.value ? "text-primary" : "text-muted-foreground"}`} />
-                  <span className={`font-medium ${theme === t.value ? "text-primary" : "text-foreground"}`}>
+                  <t.icon
+                    className={`h-8 w-8 mb-2 ${theme === t.value ? "text-primary" : "text-muted-foreground"}`}
+                  />
+                  <span
+                    className={`font-medium ${theme === t.value ? "text-primary" : "text-foreground"}`}
+                  >
                     {t.label}
                   </span>
                   {theme === t.value && (
-                    <span className="text-xs text-primary mt-1">Current Theme</span>
+                    <span className="text-xs text-primary mt-1">
+                      Current Theme
+                    </span>
                   )}
                 </button>
               </Form>
@@ -200,22 +220,30 @@ export default function SettingsPage({ loaderData, actionData }: Route.Component
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+                <CardTitle className="text-sm font-medium">
+                  Total Users
+                </CardTitle>
                 <Settings className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{company._count.users}</div>
-                <p className="text-xs text-muted-foreground">Active team members</p>
+                <p className="text-xs text-muted-foreground">
+                  Active team members
+                </p>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Assets</CardTitle>
+                <CardTitle className="text-sm font-medium">
+                  Total Assets
+                </CardTitle>
                 <Settings className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{company._count.assets}</div>
+                <div className="text-2xl font-bold">
+                  {company._count.assets}
+                </div>
                 <p className="text-xs text-muted-foreground">In inventory</p>
               </CardContent>
             </Card>
@@ -237,7 +265,11 @@ export default function SettingsPage({ loaderData, actionData }: Route.Component
                     name="name"
                     defaultValue={company.name}
                     required
-                    error={actionData && "errors" in actionData ? actionData.errors?.name : undefined}
+                    error={
+                      actionData && "errors" in actionData
+                        ? actionData.errors?.name
+                        : undefined
+                    }
                   />
 
                   <FormField
@@ -245,14 +277,22 @@ export default function SettingsPage({ loaderData, actionData }: Route.Component
                     name="email"
                     type="email"
                     defaultValue={company.email || ""}
-                    error={actionData && "errors" in actionData ? actionData.errors?.email : undefined}
+                    error={
+                      actionData && "errors" in actionData
+                        ? actionData.errors?.email
+                        : undefined
+                    }
                   />
 
                   <FormField
                     label="Phone"
                     name="phone"
                     defaultValue={company.phone || ""}
-                    error={actionData && "errors" in actionData ? actionData.errors?.phone : undefined}
+                    error={
+                      actionData && "errors" in actionData
+                        ? actionData.errors?.phone
+                        : undefined
+                    }
                   />
 
                   <FormField
@@ -260,7 +300,11 @@ export default function SettingsPage({ loaderData, actionData }: Route.Component
                     name="website"
                     type="url"
                     defaultValue={company.website || ""}
-                    error={actionData && "errors" in actionData ? actionData.errors?.website : undefined}
+                    error={
+                      actionData && "errors" in actionData
+                        ? actionData.errors?.website
+                        : undefined
+                    }
                   />
                 </div>
 
@@ -303,7 +347,8 @@ export default function SettingsPage({ loaderData, actionData }: Route.Component
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            You are not associated with any company. Please contact an administrator.
+            You are not associated with any company. Please contact an
+            administrator.
           </AlertDescription>
         </Alert>
       )}

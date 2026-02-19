@@ -11,7 +11,7 @@ export type ValidationResult<T> =
  */
 export async function validateFormData<T>(
   formData: FormData,
-  schema: ZodSchema<T>
+  schema: ZodSchema<T>,
 ): Promise<ValidationResult<T>> {
   const rawData = Object.fromEntries(formData);
 
@@ -41,7 +41,7 @@ export async function validateFormData<T>(
  */
 export async function validateData<T>(
   rawData: Record<string, unknown>,
-  schema: ZodSchema<T>
+  schema: ZodSchema<T>,
 ): Promise<ValidationResult<T>> {
   try {
     const validData = schema.parse(rawData);
@@ -67,7 +67,7 @@ export async function validateData<T>(
  * Useful when using safeParse directly.
  */
 export function flattenZodErrors(
-  fieldErrors: Record<string, string[] | undefined>
+  fieldErrors: Record<string, string[] | undefined>,
 ): Record<string, string> {
   const errors: Record<string, string> = {};
   for (const [key, messages] of Object.entries(fieldErrors)) {

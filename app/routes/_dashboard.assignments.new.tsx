@@ -10,7 +10,13 @@ import {
   validateUserForAssignment,
   createAssignment,
 } from "~/services/assignment.service.server";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { FormField } from "~/components/forms/form-field";
 import { FormSelect } from "~/components/forms/form-select";
@@ -31,7 +37,10 @@ export async function loader({ request }: Route.LoaderArgs) {
     getActiveUsers(companyFilter),
   ]);
 
-  return { availableAssets, users };
+  const url = new URL(request.url);
+  const preSelectedUserId = url.searchParams.get("userId");
+
+  return { availableAssets, users, preSelectedUserId };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -54,7 +63,10 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   // Validate asset
-  const assetValidation = await validateAssetForAssignment(assetId, companyFilter);
+  const assetValidation = await validateAssetForAssignment(
+    assetId,
+    companyFilter,
+  );
   if (!assetValidation.valid) {
     return errorResponse(assetValidation.error || "Invalid asset");
   }
@@ -80,8 +92,11 @@ export async function action({ request }: Route.ActionArgs) {
   }
 }
 
-export default function NewAssignmentPage({ loaderData, actionData }: Route.ComponentProps) {
-  const { availableAssets, users } = loaderData;
+export default function NewAssignmentPage({
+  loaderData,
+  actionData,
+}: Route.ComponentProps) {
+  const { availableAssets, users, preSelectedUserId } = loaderData;
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
 
@@ -118,14 +133,16 @@ export default function NewAssignmentPage({ loaderData, actionData }: Route.Comp
             <Alert className="mb-6">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                No available assets to assign. All assets are currently assigned or in other states.
+                No available assets to assign. All assets are currently assigned
+                or in other states.
               </AlertDescription>
             </Alert>
           ) : users.length === 0 ? (
             <Alert className="mb-6">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                No active users available. Please ensure there are active users in the system.
+                No active users available. Please ensure there are active users
+                in the system.
               </AlertDescription>
             </Alert>
           ) : (
@@ -148,6 +165,7 @@ export default function NewAssignmentPage({ loaderData, actionData }: Route.Comp
                   name="userId"
                   required
                   placeholder="Select a user"
+                  defaultValue={preSelectedUserId || ""}
                   options={users.map((user) => ({
                     label: `${user.firstName} ${user.lastName} (${user.email})`,
                     value: user.id,
@@ -171,7 +189,9 @@ export default function NewAssignmentPage({ loaderData, actionData }: Route.Comp
 
               <div className="flex gap-4">
                 <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {isSubmitting && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
                   Create Assignment
                 </Button>
                 <Link to="/dashboard/assignments">

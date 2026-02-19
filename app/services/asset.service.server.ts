@@ -25,15 +25,15 @@ export interface AssetPagination {
 
 // Helper to normalize company filter for Prisma
 function normalizeCompanyFilter(
-  companyFilter: { companyId: string | null } | { companyId: { in: string[] } }
+  companyFilter: { companyId: string | null } | { companyId: { in: string[] } },
 ): Prisma.AssetWhereInput {
   const cid = companyFilter.companyId;
-  
+
   // Check if it's an OWNER filter with { in: [...] }
   if (cid && typeof cid === "object" && "in" in cid) {
     return { companyId: cid };
   }
-  
+
   // For single company (ADMIN/USER), if null then return empty (shouldn't happen for assets)
   return cid ? { companyId: cid as string } : {};
 }
@@ -43,7 +43,7 @@ function normalizeCompanyFilter(
  */
 export async function getAssets(
   companyFilter: { companyId: string | null } | { companyId: { in: string[] } },
-  filters: AssetFilters
+  filters: AssetFilters,
 ) {
   const {
     page,
@@ -58,27 +58,36 @@ export async function getAssets(
   } = filters;
 
   const baseFilter = normalizeCompanyFilter(companyFilter);
-  
+
   const where: Prisma.AssetWhereInput = {
     AND: [
       baseFilter,
       status ? { status } : { status: { not: "RETIRED" } },
       category ? { category } : {},
       ownerId ? { ownerId } : {},
-      search ? {
-        OR: [
-          { name: { contains: search, mode: "insensitive" as const } },
-          { serialNumber: { contains: search, mode: "insensitive" as const } },
-          { category: { contains: search, mode: "insensitive" as const } },
-        ],
-      } : {},
-      userId ? {
-        OR: [
-          { assignments: { some: { userId, status: "ACTIVE" } } },
-          { createdById: userId },
-          { ownerId: userId },
-        ],
-      } : {},
+      search
+        ? {
+            OR: [
+              { name: { contains: search, mode: "insensitive" as const } },
+              {
+                serialNumber: {
+                  contains: search,
+                  mode: "insensitive" as const,
+                },
+              },
+              { category: { contains: search, mode: "insensitive" as const } },
+            ],
+          }
+        : {},
+      userId
+        ? {
+            OR: [
+              { assignments: { some: { userId, status: "ACTIVE" } } },
+              { createdById: userId },
+              { ownerId: userId },
+            ],
+          }
+        : {},
     ],
   };
 
@@ -106,7 +115,12 @@ export async function getAssets(
           where: { status: "ACTIVE" },
           include: {
             user: {
-              select: { id: true, firstName: true, lastName: true, email: true },
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
             },
           },
           take: 1,
@@ -139,7 +153,7 @@ export async function getAssets(
 export async function getAssetById(
   assetId: string,
   companyFilter: { companyId: string | null } | { companyId: { in: string[] } },
-  checkAccessForUserId?: string // Optional: restrict access to this user
+  checkAccessForUserId?: string, // Optional: restrict access to this user
 ) {
   const baseFilter = normalizeCompanyFilter(companyFilter);
   const where: Prisma.AssetWhereInput = {
@@ -149,7 +163,11 @@ export async function getAssetById(
 
   if (checkAccessForUserId) {
     where.OR = [
-      { assignments: { some: { userId: checkAccessForUserId, status: "ACTIVE" } } },
+      {
+        assignments: {
+          some: { userId: checkAccessForUserId, status: "ACTIVE" },
+        },
+      },
       { createdById: checkAccessForUserId },
       { ownerId: checkAccessForUserId },
     ];
@@ -202,7 +220,7 @@ export async function createAsset(
     otherOwnership?: string;
   },
   companyId: string,
-  createdById: string
+  createdById: string,
 ) {
   // Create the asset
   try {
@@ -221,8 +239,9 @@ export async function createAsset(
         tags: data.tags || [],
         imageUrl: data.imageUrl || null,
         ownershipType: data.ownershipType || "COMPANY",
-        ownerId: data.ownershipType === "PRIVATE" ? (data.ownerId || null) : null,
-        otherOwnership: data.ownershipType === "OTHER" ? (data.otherOwnership || null) : null,
+        ownerId: data.ownershipType === "PRIVATE" ? data.ownerId || null : null,
+        otherOwnership:
+          data.ownershipType === "OTHER" ? data.otherOwnership || null : null,
         status: "AVAILABLE",
         companyId,
         createdById,
@@ -242,7 +261,10 @@ export async function createAsset(
 
     return { asset };
   } catch (error: any) {
-    if (error.code === "P2002" && error.meta?.target?.includes("serialNumber")) {
+    if (
+      error.code === "P2002" &&
+      error.meta?.target?.includes("serialNumber")
+    ) {
       return { error: "Asset with this serial number already exists" };
     }
     throw error;
@@ -272,7 +294,7 @@ export async function updateAsset(
     ownerId?: string;
     otherOwnership?: string;
   },
-  companyFilter: { companyId: string | null } | { companyId: { in: string[] } }
+  companyFilter: { companyId: string | null } | { companyId: { in: string[] } },
 ) {
   const baseFilter = normalizeCompanyFilter(companyFilter);
   // Verify asset exists and belongs to the company
@@ -288,12 +310,19 @@ export async function updateAsset(
   }
 
   // If changing status from ASSIGNED, check active assignments
-  if (data.status && data.status !== "ASSIGNED" && existingAsset.status === "ASSIGNED") {
+  if (
+    data.status &&
+    data.status !== "ASSIGNED" &&
+    existingAsset.status === "ASSIGNED"
+  ) {
     const activeAssignment = await prisma.assignment.findFirst({
       where: { assetId, status: "ACTIVE" },
     });
     if (activeAssignment) {
-      return { error: "Cannot change status of an assigned asset. Please return the asset first." };
+      return {
+        error:
+          "Cannot change status of an assigned asset. Please return the asset first.",
+      };
     }
   }
 
@@ -302,27 +331,51 @@ export async function updateAsset(
       where: { id: assetId },
       data: {
         ...(data.name !== undefined && { name: data.name }),
-        ...(data.description !== undefined && { description: data.description || null }),
-        ...(data.serialNumber !== undefined && { serialNumber: data.serialNumber || null }),
+        ...(data.description !== undefined && {
+          description: data.description || null,
+        }),
+        ...(data.serialNumber !== undefined && {
+          serialNumber: data.serialNumber || null,
+        }),
         ...(data.model !== undefined && { model: data.model || null }),
-        ...(data.manufacturer !== undefined && { manufacturer: data.manufacturer || null }),
-        ...(data.purchaseDate !== undefined && { purchaseDate: data.purchaseDate || null }),
-        ...(data.purchasePrice !== undefined && { purchasePrice: data.purchasePrice || null }),
-        ...(data.currentValue !== undefined && { currentValue: data.currentValue || null }),
+        ...(data.manufacturer !== undefined && {
+          manufacturer: data.manufacturer || null,
+        }),
+        ...(data.purchaseDate !== undefined && {
+          purchaseDate: data.purchaseDate || null,
+        }),
+        ...(data.purchasePrice !== undefined && {
+          purchasePrice: data.purchasePrice || null,
+        }),
+        ...(data.currentValue !== undefined && {
+          currentValue: data.currentValue || null,
+        }),
         ...(data.location !== undefined && { location: data.location || null }),
         ...(data.status !== undefined && { status: data.status }),
         ...(data.category !== undefined && { category: data.category || null }),
         ...(data.tags !== undefined && { tags: data.tags }),
-        ...(data.ownershipType !== undefined && { ownershipType: data.ownershipType }),
-        // If ownershipType is provided, clear irrelevant fields. 
-        // If not provided but ownerId/otherOwnership are, they will be updated as requested.
-        ...(data.ownershipType !== undefined ? {
-          ownerId: data.ownershipType === "PRIVATE" ? (data.ownerId || null) : null,
-          otherOwnership: data.ownershipType === "OTHER" ? (data.otherOwnership || null) : null,
-        } : {
-          ...(data.ownerId !== undefined && { ownerId: data.ownerId || null }),
-          ...(data.otherOwnership !== undefined && { otherOwnership: data.otherOwnership || null }),
+        ...(data.ownershipType !== undefined && {
+          ownershipType: data.ownershipType,
         }),
+        // If ownershipType is provided, clear irrelevant fields.
+        // If not provided but ownerId/otherOwnership are, they will be updated as requested.
+        ...(data.ownershipType !== undefined
+          ? {
+              ownerId:
+                data.ownershipType === "PRIVATE" ? data.ownerId || null : null,
+              otherOwnership:
+                data.ownershipType === "OTHER"
+                  ? data.otherOwnership || null
+                  : null,
+            }
+          : {
+              ...(data.ownerId !== undefined && {
+                ownerId: data.ownerId || null,
+              }),
+              ...(data.otherOwnership !== undefined && {
+                otherOwnership: data.otherOwnership || null,
+              }),
+            }),
       },
       include: {
         createdBy: {
@@ -333,7 +386,10 @@ export async function updateAsset(
 
     return { asset: updatedAsset };
   } catch (error: any) {
-    if (error.code === "P2002" && error.meta?.target?.includes("serialNumber")) {
+    if (
+      error.code === "P2002" &&
+      error.meta?.target?.includes("serialNumber")
+    ) {
       return { error: "Asset with this serial number already exists" };
     }
     throw error;
@@ -345,7 +401,7 @@ export async function updateAsset(
  */
 export async function deleteAsset(
   assetId: string,
-  companyFilter: { companyId: string | null } | { companyId: { in: string[] } }
+  companyFilter: { companyId: string | null } | { companyId: { in: string[] } },
 ) {
   const baseFilter = normalizeCompanyFilter(companyFilter);
   // Verify asset exists and belongs to the company
@@ -366,7 +422,10 @@ export async function deleteAsset(
   });
 
   if (activeAssignment) {
-    return { error: "Cannot delete an asset that is currently assigned. Please return the asset first." };
+    return {
+      error:
+        "Cannot delete an asset that is currently assigned. Please return the asset first.",
+    };
   }
 
   // Set status to RETIRED instead of soft delete
@@ -383,7 +442,7 @@ export async function deleteAsset(
  */
 export async function restoreAsset(
   assetId: string,
-  companyFilter: { companyId: string | null } | { companyId: { in: string[] } }
+  companyFilter: { companyId: string | null } | { companyId: { in: string[] } },
 ) {
   const baseFilter = normalizeCompanyFilter(companyFilter);
   // Verify asset exists and belongs to the company
@@ -412,7 +471,7 @@ export async function restoreAsset(
  */
 export async function regenerateQRCode(
   assetId: string,
-  companyFilter: { companyId: string | null } | { companyId: { in: string[] } }
+  companyFilter: { companyId: string | null } | { companyId: { in: string[] } },
 ) {
   const baseFilter = normalizeCompanyFilter(companyFilter);
   const asset = await prisma.asset.findFirst({
@@ -440,7 +499,7 @@ export async function regenerateQRCode(
  */
 export async function deleteAssetImage(
   assetId: string,
-  companyFilter: { companyId: string | null } | { companyId: { in: string[] } }
+  companyFilter: { companyId: string | null } | { companyId: { in: string[] } },
 ) {
   const baseFilter = normalizeCompanyFilter(companyFilter);
   const asset = await prisma.asset.findFirst({

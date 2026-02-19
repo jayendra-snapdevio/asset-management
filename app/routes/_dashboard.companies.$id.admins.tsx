@@ -334,7 +334,11 @@ export default function CompanyAdminsPage({
                 required
               />
               <div className="flex items-end">
-                <Button type="submit" className="w-full sm:w-auto" disabled={isSubmitting || !selectedEmail}>
+                <Button
+                  type="submit"
+                  className="w-full sm:w-auto"
+                  disabled={isSubmitting || !selectedEmail}
+                >
                   <UserPlus className="h-4 w-4 mr-2" />
                   {isSubmitting ? "Adding..." : "Add Admin"}
                 </Button>
@@ -369,7 +373,10 @@ export default function CompanyAdminsPage({
             <p className="text-sm text-muted-foreground mb-2">
               User doesn't exist yet?
             </p>
-            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+            <Dialog
+              open={isCreateDialogOpen}
+              onOpenChange={setIsCreateDialogOpen}
+            >
               <DialogTrigger asChild>
                 <Button variant="outline">
                   <UserPlus className="h-4 w-4 mr-2" />
@@ -380,7 +387,8 @@ export default function CompanyAdminsPage({
                 <DialogHeader>
                   <DialogTitle>Create New Admin</DialogTitle>
                   <DialogDescription>
-                    Create a new user account with admin privileges for this company.
+                    Create a new user account with admin privileges for this
+                    company.
                   </DialogDescription>
                 </DialogHeader>
                 <Form method="post" className="space-y-4">
@@ -412,7 +420,11 @@ export default function CompanyAdminsPage({
                     errors={errors?.password}
                   />
                   <DialogFooter>
-                    <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsCreateDialogOpen(false)}
+                    >
                       Cancel
                     </Button>
                     <Button type="submit" disabled={isSubmitting}>
@@ -464,7 +476,11 @@ export default function CompanyAdminsPage({
                       <TableCell>{getRoleBadge(admin.role)}</TableCell>
                       <TableCell className="text-right">
                         <Form method="post" className="inline">
-                          <input type="hidden" name="intent" value="remove-admin" />
+                          <input
+                            type="hidden"
+                            name="intent"
+                            value="remove-admin"
+                          />
                           <input type="hidden" name="userId" value={admin.id} />
                           <Button
                             type="submit"
@@ -515,12 +531,22 @@ export default function CompanyAdminsPage({
                       <TableCell className="font-medium whitespace-nowrap">
                         {user.firstName} {user.lastName}
                       </TableCell>
-                      <TableCell className="whitespace-nowrap">{user.email}</TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {user.email}
+                      </TableCell>
                       <TableCell>{getRoleBadge(user.role)}</TableCell>
                       <TableCell className="text-right">
                         <Form method="post" className="inline">
-                          <input type="hidden" name="intent" value="add-admin" />
-                          <input type="hidden" name="email" value={user.email} />
+                          <input
+                            type="hidden"
+                            name="intent"
+                            value="add-admin"
+                          />
+                          <input
+                            type="hidden"
+                            name="email"
+                            value={user.email}
+                          />
                           <Button
                             type="submit"
                             variant="outline"

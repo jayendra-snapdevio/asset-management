@@ -5,7 +5,13 @@ import { requireRole } from "~/lib/session.server";
 import { createAsset } from "~/services/asset.service.server";
 import { createAssetSchema } from "~/validators/asset.validator";
 import { uploadFile } from "~/lib/upload.server";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { FormField } from "~/components/forms/form-field";
 import { FormTextarea } from "~/components/forms/form-textarea";
@@ -20,13 +26,19 @@ export function meta() {
 
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await requireRole(request, ["USER"]);
-  
+
   if (!user.companyId) {
-    throw new Response("You must be associated with a company to create assets", { status: 403 });
+    throw new Response(
+      "You must be associated with a company to create assets",
+      { status: 403 },
+    );
   }
-  
+
   const { users } = await getUsers(user, { page: 1, limit: 1000 });
-  const userOptions = users.map(u => ({ label: `${u.firstName} ${u.lastName} (${u.email})`, value: u.id }));
+  const userOptions = users.map((u) => ({
+    label: `${u.firstName} ${u.lastName} (${u.email})`,
+    value: u.id,
+  }));
 
   return { user, userOptions };
 }
@@ -36,13 +48,16 @@ export async function action({ request }: Route.ActionArgs) {
 
   if (!user.companyId) {
     return data(
-      { error: "You must be associated with a company to create assets", errors: undefined },
-      { status: 403 }
+      {
+        error: "You must be associated with a company to create assets",
+        errors: undefined,
+      },
+      { status: 403 },
     );
   }
 
   const formData = await request.formData();
-  
+
   const file = formData.get("image") as File | null;
   let imageUrl: string | undefined = undefined;
 
@@ -51,27 +66,30 @@ export async function action({ request }: Route.ActionArgs) {
     if (!uploadResult.success) {
       return data(
         { error: uploadResult.error, errors: undefined },
-        { status: 400 }
+        { status: 400 },
       );
     }
     imageUrl = uploadResult.url;
   }
 
   const rawData = Object.fromEntries(formData);
-  
+
   // Add companyId for validation
-  const dataWithCompany = { 
-    ...rawData, 
+  const dataWithCompany = {
+    ...rawData,
     companyId: user.companyId,
-    imageUrl 
+    imageUrl,
   };
-  
+
   const validationResult = createAssetSchema.safeParse(dataWithCompany);
-  
+
   if (!validationResult.success) {
     return data(
-      { errors: validationResult.error.flatten().fieldErrors, error: undefined },
-      { status: 400 }
+      {
+        errors: validationResult.error.flatten().fieldErrors,
+        error: undefined,
+      },
+      { status: 400 },
     );
   }
 
@@ -94,20 +112,20 @@ export async function action({ request }: Route.ActionArgs) {
       otherOwnership: validationResult.data.otherOwnership,
     },
     user.companyId,
-    user.id
+    user.id,
   );
 
   if (result.error) {
-    return data(
-      { error: result.error, errors: undefined },
-      { status: 400 }
-    );
+    return data({ error: result.error, errors: undefined }, { status: 400 });
   }
 
   return redirect(`/dashboard/assets/${result.asset!.id}`);
 }
 
-export default function NewUserAssetPage({ loaderData, actionData }: Route.ComponentProps) {
+export default function NewUserAssetPage({
+  loaderData,
+  actionData,
+}: Route.ComponentProps) {
   const { user, userOptions } = loaderData;
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
@@ -138,7 +156,11 @@ export default function NewUserAssetPage({ loaderData, actionData }: Route.Compo
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Form method="post" encType="multipart/form-data" className="space-y-6">
+          <Form
+            method="post"
+            encType="multipart/form-data"
+            className="space-y-6"
+          >
             {actionData?.error && (
               <div className="p-3 bg-destructive/10 text-destructive rounded-md text-sm">
                 {actionData.error}
@@ -147,23 +169,23 @@ export default function NewUserAssetPage({ loaderData, actionData }: Route.Compo
 
             {/* Basic Info */}
             <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                label="Asset Name"
-                name="name"
-                placeholder="e.g., MacBook Pro 16-inch"
-                required
-                error={actionData?.errors?.name}
-              />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  label="Asset Name"
+                  name="name"
+                  placeholder="e.g., MacBook Pro 16-inch"
+                  required
+                  error={actionData?.errors?.name}
+                />
 
-              <FormField
-                label="Asset Image"
-                name="image"
-                type="file"
-                accept="image/*"
-                helperText="Optional. Max 5MB. Formats: JPG, PNG, GIF, WebP."
-              />
-            </div>
+                <FormField
+                  label="Asset Image"
+                  name="image"
+                  type="file"
+                  accept="image/*"
+                  helperText="Optional. Max 5MB. Formats: JPG, PNG, GIF, WebP."
+                />
+              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField

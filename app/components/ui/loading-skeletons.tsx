@@ -4,7 +4,13 @@ import { Card, CardContent, CardHeader } from "~/components/ui/card";
 /**
  * Table skeleton for loading states
  */
-export function TableSkeleton({ rows = 5, columns = 4 }: { rows?: number; columns?: number }) {
+export function TableSkeleton({
+  rows = 5,
+  columns = 4,
+}: {
+  rows?: number;
+  columns?: number;
+}) {
   return (
     <div className="w-full">
       {/* Header */}

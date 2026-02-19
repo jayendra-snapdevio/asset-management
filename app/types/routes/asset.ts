@@ -1,4 +1,8 @@
-import type { AssetStatus, AssignmentStatus, OwnershipType } from "@prisma/client";
+import type {
+  AssetStatus,
+  AssignmentStatus,
+  OwnershipType,
+} from "@prisma/client";
 
 export interface AssetFilters {
   search?: string;
@@ -20,8 +24,18 @@ export interface AssetListItem {
   purchaseDate: Date | null;
   purchasePrice: number | null;
   createdAt: Date;
-  createdBy: { id: string; firstName: string; lastName: string; email: string } | null;
-  owner: { id: string; firstName: string; lastName: string; email: string } | null;
+  createdBy: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  } | null;
+  owner: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  } | null;
   assignments: {
     id: string;
     status: string;
@@ -50,8 +64,18 @@ export interface AssetDetail {
   otherOwnership: string | null;
   createdAt: Date;
   updatedAt: Date;
-  createdBy: { id: string; firstName: string; lastName: string; email: string } | null;
-  owner: { id: string; firstName: string; lastName: string; email: string } | null;
+  createdBy: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  } | null;
+  owner: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  } | null;
   company: { id: string; name: string } | null;
   assignments: {
     id: string;

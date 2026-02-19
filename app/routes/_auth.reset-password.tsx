@@ -5,7 +5,14 @@ import { prisma } from "~/lib/db.server";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "~/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
 import { z } from "zod";
 
 const resetPasswordSchema = z
@@ -16,7 +23,7 @@ const resetPasswordSchema = z
       .min(8, "Password must be at least 8 characters")
       .regex(
         /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
-        "Password must contain uppercase, lowercase, and number"
+        "Password must contain uppercase, lowercase, and number",
       ),
     confirmPassword: z.string().min(1, "Please confirm your password"),
   })
@@ -60,7 +67,9 @@ export async function loader({ request }: Route.LoaderArgs) {
   });
 
   if (!user) {
-    return data<LoaderResponse>({ error: "Reset token is invalid or has expired" });
+    return data<LoaderResponse>({
+      error: "Reset token is invalid or has expired",
+    });
   }
 
   return data<LoaderResponse>({ token, valid: true });
@@ -75,7 +84,7 @@ export async function action({ request }: Route.ActionArgs) {
   if (!result.success) {
     return data<ActionResponse>(
       { errors: result.error.flatten().fieldErrors },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -92,7 +101,7 @@ export async function action({ request }: Route.ActionArgs) {
   if (!user) {
     return data<ActionResponse>(
       { error: "Reset token is invalid or has expired" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -110,7 +119,10 @@ export async function action({ request }: Route.ActionArgs) {
   return redirect("/login?reset=success");
 }
 
-export default function ResetPasswordPage({ loaderData, actionData }: Route.ComponentProps) {
+export default function ResetPasswordPage({
+  loaderData,
+  actionData,
+}: Route.ComponentProps) {
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
   const loaderError = loaderData?.error as string | undefined;
@@ -179,7 +191,9 @@ export default function ResetPasswordPage({ loaderData, actionData }: Route.Comp
               autoComplete="new-password"
             />
             {errors?.confirmPassword && (
-              <p className="text-sm text-red-500">{errors.confirmPassword[0]}</p>
+              <p className="text-sm text-red-500">
+                {errors.confirmPassword[0]}
+              </p>
             )}
           </div>
         </CardContent>

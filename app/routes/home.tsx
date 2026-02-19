@@ -1,9 +1,14 @@
 import type { Route } from "./+types/home";
 import { Link } from "react-router";
 import { Button } from "~/components/ui/button";
-import { Card, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import {
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
 
-export function meta({ }: Route.MetaArgs) {
+export function meta({}: Route.MetaArgs) {
   return [
     { title: "Asset Management System" },
     { name: "description", content: "Manage your company assets efficiently" },
@@ -22,9 +27,9 @@ export default function Home() {
               <span className="text-primary"> System</span>
             </h1>
             <p className="mx-auto max-w-2xl text-lg text-muted-foreground">
-              Track, manage, and optimize your company assets with our comprehensive
-              asset management solution. Assign assets to users, monitor status,
-              and generate reports with ease.
+              Track, manage, and optimize your company assets with our
+              comprehensive asset management solution. Assign assets to users,
+              monitor status, and generate reports with ease.
             </p>
           </div>
 
@@ -72,7 +77,8 @@ export default function Home() {
           {/* Tech Stack */}
           <div className="mt-16 text-center">
             <p className="text-sm text-muted-foreground">
-              Built with React Router v7 • TypeScript • Tailwind CSS • shadcn/ui • Prisma • MongoDB
+              Built with React Router v7 • TypeScript • Tailwind CSS • shadcn/ui
+              • Prisma • MongoDB
             </p>
           </div>
         </div>

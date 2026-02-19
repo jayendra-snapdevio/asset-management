@@ -52,7 +52,7 @@ vi.mock("~/lib/session.server", () => ({
 function createMockRequest(
   method: string = "GET",
   body?: Record<string, string>,
-  url: string = "http://localhost:3000"
+  url: string = "http://localhost:3000",
 ): Request {
   const options: RequestInit = {
     method,
