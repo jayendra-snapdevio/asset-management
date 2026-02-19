@@ -798,8 +798,8 @@ function RequestTableRow({
       </TableCell>
 
       {/* Actions */}
-      <TableCell className="text-right">
-        <div className="flex items-center flex-row justify-end gap-2 ">
+      <TableCell className="text-center">
+        <div className="flex items-center flex-row justify-center gap-2 ">
           {/* Workflow actions */}
           {req.status === "PENDING" && (
             <HandleRequestDialog req={req} isSubmitting={isSubmitting} />
