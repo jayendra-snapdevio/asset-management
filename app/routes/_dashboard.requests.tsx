@@ -56,12 +56,20 @@ export function meta() {
 
 export async function loader({ request }: Route.LoaderArgs) {
   const { prisma } = await import("../lib/db.server");
+  const { getCompanyFilter } = await import("../services/company.service.server");
   const adminUser = await requireAdmin(request);
+  const companyFilter = await getCompanyFilter(adminUser);
   const url = new URL(request.url);
   const status = url.searchParams.get("status");
 
-  const requests = await prisma.assetRequest.findMany({
-    where: status ? { status: status as RequestStatus } : {},
+  // Fetch all requests relevant to the user's companies
+  const allRequests = await prisma.assetRequest.findMany({
+    where: {
+      ...(status ? { status: status as RequestStatus } : {}),
+      user: {
+        companyId: companyFilter.companyId,
+      },
+    },
     include: {
       user: {
         select: {
@@ -69,27 +77,49 @@ export async function loader({ request }: Route.LoaderArgs) {
           firstName: true,
           lastName: true,
           email: true,
+          companyId: true,
+          company: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
         },
       },
     },
     orderBy: { createdAt: "desc" },
   });
 
-  // Fetch available assets for fulfillment
+  // Separate requests: My Company vs Other Companies (for Owners)
+  const myCompanyRequests = allRequests.filter(
+    (req) => req.user.companyId === adminUser.companyId,
+  );
+  const otherCompanyRequests = allRequests.filter(
+    (req) => req.user.companyId !== adminUser.companyId,
+  );
+
+  // Fetch available assets for fulfillment (from all companies the user manages)
   const availableAssets = await prisma.asset.findMany({
     where: {
       status: "AVAILABLE",
-      companyId: adminUser.companyId || undefined,
+      companyId: companyFilter.companyId || undefined,
     },
     select: {
       id: true,
       name: true,
       serialNumber: true,
       model: true,
+      companyId: true,
     },
   });
 
-  return { requests, user: adminUser, availableAssets };
+  return {
+    requests: allRequests,
+    myCompanyRequests,
+    otherCompanyRequests,
+    user: adminUser,
+    availableAssets,
+  };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -290,7 +320,14 @@ type RequestRow = {
   adminNotes: string | null;
   createdAt: Date;
   fulfilledAt: Date | null;
-  user: { id: string; firstName: string; lastName: string; email: string };
+  user: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    companyId: string | null;
+    company?: { id: string; name: string } | null;
+  };
 };
 
 // ─── Edit Dialog ─────────────────────────────────────────────────────────────
@@ -684,7 +721,8 @@ export default function AssetRequestsPage({
   loaderData,
   actionData,
 }: Route.ComponentProps) {
-  const { requests, availableAssets } = loaderData;
+  const { myCompanyRequests, otherCompanyRequests, availableAssets, user } =
+    loaderData;
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
 
@@ -700,8 +738,10 @@ export default function AssetRequestsPage({
     }
   }, [actionData]);
 
+  const isOwner = user.role === "OWNER";
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold">Asset Requests</h1>
         <p className="text-muted-foreground">
@@ -709,56 +749,109 @@ export default function AssetRequestsPage({
         </p>
       </div>
 
+      {/* My Company Requests */}
       <Card>
         <CardHeader>
-          <CardTitle>All Requests</CardTitle>
-          <CardDescription>{requests.length} total requests</CardDescription>
+          <CardTitle>
+            {isOwner ? "My Company Requests" : "All Requests"}
+          </CardTitle>
+          <CardDescription>
+            {myCompanyRequests.length} requests from your primary company
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          {requests.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <Clock className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">No asset requests found.</p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>User</TableHead>
-                  <TableHead>Asset Requested</TableHead>
-                  <TableHead>Requested On</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-center">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {requests.map((req) => (
-                  <RequestTableRow
-                    key={req.id}
-                    req={req as RequestRow}
-                    availableAssets={availableAssets}
-                  />
-                ))}
-              </TableBody>
-            </Table>
-          )}
+          <RequestsTable
+            requests={myCompanyRequests as RequestRow[]}
+            availableAssets={availableAssets}
+          />
         </CardContent>
       </Card>
+
+      {/* Other Company Requests (Owner Only) */}
+      {isOwner && otherCompanyRequests.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Other Company Requests</CardTitle>
+            <CardDescription>
+              {otherCompanyRequests.length} requests from other companies you
+              own
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <RequestsTable
+              requests={otherCompanyRequests as RequestRow[]}
+              availableAssets={availableAssets}
+              showCompany
+            />
+          </CardContent>
+        </Card>
+      )}
     </div>
+  );
+}
+
+function RequestsTable({
+  requests,
+  availableAssets,
+  showCompany = false,
+}: {
+  requests: RequestRow[];
+  availableAssets: any[];
+  showCompany?: boolean;
+}) {
+  if (requests.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-center">
+        <Clock className="h-12 w-12 text-muted-foreground mb-4" />
+        <p className="text-muted-foreground">No asset requests found.</p>
+      </div>
+    );
+  }
+
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>User</TableHead>
+          {showCompany && <TableHead>Company</TableHead>}
+          <TableHead>Asset Requested</TableHead>
+          <TableHead>Requested On</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead className="text-center">Actions</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {requests.map((req) => (
+          <RequestTableRow
+            key={req.id}
+            req={req}
+            availableAssets={availableAssets}
+            showCompany={showCompany}
+          />
+        ))}
+      </TableBody>
+    </Table>
   );
 }
 
 function RequestTableRow({
   req,
   availableAssets,
+  showCompany = false,
 }: {
   req: RequestRow;
   availableAssets: any[];
+  showCompany?: boolean;
 }) {
   const navigation = useNavigation();
   const isSubmitting =
     navigation.state === "submitting" &&
     navigation.formData?.get("requestId") === req.id;
+
+  // Filter available assets to only show those belonging to the request user's company
+  const filteredAssets = availableAssets.filter(
+    (asset) => asset.companyId === req.user.companyId,
+  );
 
   return (
     <TableRow key={req.id}>
@@ -773,6 +866,15 @@ function RequestTableRow({
           </span>
         </div>
       </TableCell>
+
+      {/* Company */}
+      {showCompany && (
+        <TableCell>
+          <Badge variant="outline" className="font-normal capitalize">
+            {req.user.company?.name || "No Company"}
+          </Badge>
+        </TableCell>
+      )}
 
       {/* Asset */}
       <TableCell>
@@ -808,7 +910,7 @@ function RequestTableRow({
             <FulfillRequestDialog
               req={req}
               isSubmitting={isSubmitting}
-              availableAssets={availableAssets}
+              availableAssets={filteredAssets}
             />
           )}
 
@@ -816,7 +918,7 @@ function RequestTableRow({
           <EditRequestDialog
             req={req}
             isSubmitting={isSubmitting}
-            availableAssets={availableAssets}
+            availableAssets={filteredAssets}
           />
 
           {/* Delete */}

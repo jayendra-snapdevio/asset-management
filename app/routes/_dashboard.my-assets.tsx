@@ -588,7 +588,7 @@ export default function MyAssetsPage({
                   <TableHead>Requested On</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Admin Notes</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="text-center">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -639,9 +639,9 @@ export default function MyAssetsPage({
                     >
                       {request.adminNotes || "-"}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-center">
                       {request.status === "PENDING" && (
-                        <div className="flex justify-end gap-2">
+                        <div className="flex justify-center gap-2">
                           {/* Edit dialog */}
                           <Dialog
                             open={editRequestId === request.id}
