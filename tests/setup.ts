@@ -16,58 +16,71 @@ beforeAll(() => {
   process.env.DATABASE_URL = "mongodb://localhost:27017/test";
 });
 
-// Mock Prisma client
-vi.mock("~/lib/db.server", () => ({
-  prisma: {
-    user: {
-      findUnique: vi.fn(),
-      findFirst: vi.fn(),
-      findMany: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-      count: vi.fn(),
-    },
-    company: {
-      findUnique: vi.fn(),
-      findFirst: vi.fn(),
-      findMany: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-      count: vi.fn(),
-    },
-    asset: {
-      findUnique: vi.fn(),
-      findFirst: vi.fn(),
-      findMany: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-      count: vi.fn(),
-      groupBy: vi.fn(),
-    },
-    assignment: {
-      findUnique: vi.fn(),
-      findFirst: vi.fn(),
-      findMany: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-      count: vi.fn(),
-    },
-    $transaction: vi.fn((callback) => {
-      if (typeof callback === "function") {
-        return callback({
-          user: { create: vi.fn(), update: vi.fn() },
-          asset: { create: vi.fn(), update: vi.fn() },
-          assignment: { create: vi.fn(), update: vi.fn() },
-        });
-      }
-      return Promise.resolve(callback);
-    }),
-    $queryRaw: vi.fn(),
+// Define mock prisma object with all needed models
+const prismaMock = {
+  user: {
+    findUnique: vi.fn(),
+    findFirst: vi.fn(),
+    findMany: vi.fn(() => Promise.resolve([])),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+    count: vi.fn(() => Promise.resolve(0)),
   },
+  company: {
+    findUnique: vi.fn(),
+    findFirst: vi.fn(),
+    findMany: vi.fn(() => Promise.resolve([])),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+    count: vi.fn(() => Promise.resolve(0)),
+  },
+  asset: {
+    findUnique: vi.fn(),
+    findFirst: vi.fn(),
+    findMany: vi.fn(() => Promise.resolve([])),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+    count: vi.fn(() => Promise.resolve(0)),
+    groupBy: vi.fn(() => Promise.resolve([])),
+  },
+  assignment: {
+    findUnique: vi.fn(),
+    findFirst: vi.fn(),
+    findMany: vi.fn(() => Promise.resolve([])),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+    count: vi.fn(() => Promise.resolve(0)),
+  },
+  assetRequest: {
+    findUnique: vi.fn(),
+    findFirst: vi.fn(),
+    findMany: vi.fn(() => Promise.resolve([])),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+    count: vi.fn(() => Promise.resolve(0)),
+  },
+  $transaction: vi.fn((callback) => {
+    if (typeof callback === "function") {
+      return callback({
+        user: { create: vi.fn(), update: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(() => Promise.resolve([])) },
+        asset: { create: vi.fn(), update: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(() => Promise.resolve([])) },
+        assignment: { create: vi.fn(), update: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(() => Promise.resolve([])) },
+        assetRequest: { create: vi.fn(), update: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(() => Promise.resolve([])) },
+      });
+    }
+    return Promise.resolve(callback);
+  }),
+  $queryRaw: vi.fn(),
+};
+
+// Mock Prisma client module
+vi.mock("~/lib/db.server", () => ({
+  prisma: prismaMock,
 }));
 
 // Mock auth server utilities
@@ -105,11 +118,16 @@ vi.mock("~/lib/qrcode.server", () => ({
 }));
 
 // Mock file system for uploads
-vi.mock("fs/promises", () => ({
+const fsMock = {
   writeFile: vi.fn(() => Promise.resolve()),
   unlink: vi.fn(() => Promise.resolve()),
   mkdir: vi.fn(() => Promise.resolve()),
   readFile: vi.fn(() => Promise.resolve(Buffer.from("mock-file-content"))),
+};
+
+vi.mock("fs/promises", () => ({
+  ...fsMock,
+  default: fsMock,
 }));
 
 // Helper to create mock Request objects
@@ -186,9 +204,11 @@ export function createMockAsset(overrides?: Partial<{
     tags: [],
     qrCode: null,
     imageUrl: null,
+    ownershipType: "COMPANY" as const,
+    ownerId: null,
+    otherOwnership: null,
     companyId: "company1",
     createdById: "user1",
-    isDeleted: false,
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
