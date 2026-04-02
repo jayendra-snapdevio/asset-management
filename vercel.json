@@ -1,0 +1,7 @@
+{
+  "version": 2,
+  "buildCommand": "npx prisma generate && npm run build",
+  "installCommand": "npm install",
+  "devCommand": "npm run dev",
+  "regions": ["lhr1"]
+}

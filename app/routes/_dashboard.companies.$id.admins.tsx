@@ -44,7 +44,6 @@ import {
   UserMinus,
   Shield,
   User,
-  Mail,
   Search,
 } from "lucide-react";
 import { PasswordToggleField } from "~/components/forms/password-input";

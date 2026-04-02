@@ -28,7 +28,7 @@ const devTunnelProxyFix = (): Plugin => ({
 });
 
 export default defineConfig({
-  plugins: [devTunnelProxyFix(), tailwindcss(), reactRouter(), tsconfigPaths()],
+  plugins: [tsconfigPaths(), devTunnelProxyFix(), tailwindcss(), reactRouter()],
   server: {
     allowedHosts: true,
   },

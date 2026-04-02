@@ -1,0 +1,10 @@
+node_modules
+.git
+.react-router
+.github
+tests
+coverage
+*.md
+Dockerfile
+docker-compose.yml
+.env

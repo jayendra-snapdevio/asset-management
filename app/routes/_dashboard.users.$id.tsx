@@ -43,7 +43,6 @@ import {
   ArrowLeft,
   Save,
   User,
-  Mail,
   Shield,
   Crown,
   Package,
