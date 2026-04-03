@@ -43,7 +43,6 @@ import {
   ArrowLeft,
   Save,
   User,
-  Mail,
   Shield,
   Crown,
   Package,
@@ -759,9 +758,9 @@ export default function UserDetailPage({
                     <TableCell className="text-muted-foreground">
                       {assignment.returnDate
                         ? formatDuration(
-                            assignment.assignedDate,
-                            assignment.returnDate,
-                          )
+                          assignment.assignedDate,
+                          assignment.returnDate,
+                        )
                         : "-"}
                     </TableCell>
                     <TableCell>{getStatusBadge(assignment.status)}</TableCell>

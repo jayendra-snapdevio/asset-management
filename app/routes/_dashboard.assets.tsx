@@ -4,6 +4,10 @@ import { data, Form, Link, useNavigation, useSearchParams } from "react-router";
 import type { Route } from "./+types/_dashboard.assets";
 // Server-only imports moved to loader/action to avoid Vite leakage
 import type { AssetStatus } from "@prisma/client";
+import { requireRole } from "../lib/session.server";
+import { getCompanyFilter } from "../services/company.service.server";
+import { getAssets, deleteAsset } from "../services/asset.service.server";
+import { getUsers } from "../services/user.service.server";
 import { Card, CardContent } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -63,12 +67,6 @@ export function meta() {
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const { requireRole } = await import("../lib/session.server");
-  const { getCompanyFilter } =
-    await import("../services/company.service.server");
-  const { getAssets } = await import("../services/asset.service.server");
-  const { getUsers } = await import("../services/user.service.server");
-
   const user = await requireRole(request, ["OWNER", "ADMIN", "USER"]);
   const companyFilter = await getCompanyFilter(user);
 
@@ -118,11 +116,6 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export async function action({ request }: Route.ActionArgs) {
-  const { requireRole } = await import("../lib/session.server");
-  const { getCompanyFilter } =
-    await import("../services/company.service.server");
-  const { deleteAsset } = await import("../services/asset.service.server");
-
   const user = await requireRole(request, ["OWNER", "ADMIN"]);
   const companyFilter = await getCompanyFilter(user);
   const formData = await request.formData();

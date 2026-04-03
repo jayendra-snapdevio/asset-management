@@ -9,6 +9,18 @@ import type {
   OwnershipType,
 } from "@prisma/client";
 import { updateAssetSchema } from "../validators/asset.validator";
+import { requireAuth } from "../lib/session.server";
+import { getCompanyFilter } from "../services/company.service.server";
+import {
+  getAssetById,
+  updateAsset,
+  deleteAsset,
+  restoreAsset,
+  regenerateQRCode,
+  deleteAssetImage,
+} from "../services/asset.service.server";
+import { getUsers } from "../services/user.service.server";
+import { returnAssignment } from "../services/assignment.service.server";
 import { handleError, errorResponse } from "../lib/errors.server";
 import {
   Card,
@@ -77,12 +89,6 @@ export function meta({ data }: Route.MetaArgs) {
 }
 
 export async function loader({ request, params }: Route.LoaderArgs) {
-  const { requireAuth } = await import("../lib/session.server");
-  const { getCompanyFilter } =
-    await import("../services/company.service.server");
-  const { getAssetById } = await import("../services/asset.service.server");
-  const { getUsers } = await import("../services/user.service.server");
-
   const user = await requireAuth(request);
   const companyFilter = await getCompanyFilter(user);
 
@@ -106,20 +112,6 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
-  const { requireAuth } = await import("../lib/session.server");
-  const { getCompanyFilter } =
-    await import("../services/company.service.server");
-  const {
-    getAssetById,
-    updateAsset,
-    deleteAsset,
-    restoreAsset,
-    regenerateQRCode,
-    deleteAssetImage,
-  } = await import("../services/asset.service.server");
-  const { returnAssignment } =
-    await import("../services/assignment.service.server");
-
   const user = await requireAuth(request);
   const companyFilter = await getCompanyFilter(user);
 
