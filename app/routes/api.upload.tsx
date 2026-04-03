@@ -96,3 +96,7 @@ function normalizeCompanyFilter(
   // For single company (ADMIN/USER)
   return cid ? { companyId: cid as string } : {};
 }
+
+export default function ApiUpload() {
+  return null;
+}

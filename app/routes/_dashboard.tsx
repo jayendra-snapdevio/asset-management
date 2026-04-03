@@ -5,9 +5,10 @@ import { Header } from "~/components/layout/Header";
 import { Button } from "~/components/ui/button";
 import { Link } from "react-router";
 
+import { requireAuth } from "~/lib/session.server";
+
 export async function loader({ request }: Route.LoaderArgs) {
   // This runs on every dashboard route navigation
-  const { requireAuth } = await import("../lib/session.server");
   const user = await requireAuth(request); // Redirects to /login if not authenticated
   return { user };
 }

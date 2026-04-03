@@ -14,3 +14,7 @@ export async function action({ request }: Route.ActionArgs) {
 export async function loader() {
   return redirect("/");
 }
+
+export default function Logout() {
+  return null;
+}

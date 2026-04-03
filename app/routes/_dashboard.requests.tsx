@@ -4,7 +4,10 @@ import { data, Form, useNavigation, Link } from "react-router";
 import type { Route } from "./+types/_dashboard.requests";
 // Server-side imports moved to loader/action to avoid Vite leakage
 import type { RequestStatus } from "@prisma/client";
+import { prisma } from "../lib/db.server";
 import { requireAdmin } from "../lib/session.server";
+import { getCompanyFilter } from "../services/company.service.server";
+import { handleError } from "../lib/errors.server";
 
 import {
   Card,
@@ -55,8 +58,6 @@ export function meta() {
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const { prisma } = await import("../lib/db.server");
-  const { getCompanyFilter } = await import("../services/company.service.server");
   const adminUser = await requireAdmin(request);
   const companyFilter = await getCompanyFilter(adminUser);
   const url = new URL(request.url);
@@ -123,7 +124,6 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export async function action({ request }: Route.ActionArgs) {
-  const { prisma } = await import("../lib/db.server");
   await requireAdmin(request);
   const formData = await request.formData();
   const intent = formData.get("intent");
@@ -268,7 +268,6 @@ export async function action({ request }: Route.ActionArgs) {
       await prisma.assetRequest.delete({ where: { id: requestId } });
       return data({ success: true, message: "Request deleted successfully." });
     } catch (error) {
-      const { handleError } = await import("../lib/errors.server");
       return handleError(error);
     }
   }

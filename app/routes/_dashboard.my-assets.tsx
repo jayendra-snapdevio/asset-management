@@ -4,6 +4,10 @@ import { data, Form, Link, useNavigation } from "react-router";
 import type { Route } from "./+types/_dashboard.my-assets";
 // Server-only imports moved to loader to avoid Vite leakage
 import type { AssetStatus, AssignmentStatus } from "@prisma/client";
+import { prisma } from "../lib/db.server";
+import { requireAuth } from "../lib/session.server";
+import { handleError } from "../lib/errors.server";
+import { returnAssignment } from "../services/assignment.service.server";
 import {
   Card,
   CardContent,
@@ -57,8 +61,6 @@ export function meta() {
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const { requireAuth } = await import("../lib/session.server");
-  const { prisma } = await import("../lib/db.server");
   const user = await requireAuth(request);
 
   const [currentAssets, history, ownedAssets, myRequests] = await Promise.all([
@@ -117,15 +119,11 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export async function action({ request }: Route.ActionArgs) {
-  const { requireAuth } = await import("../lib/session.server");
-  const { prisma } = await import("../lib/db.server");
   const user = await requireAuth(request);
   const formData = await request.formData();
   const intent = formData.get("intent");
 
   if (intent === "return") {
-    const { returnAssignment } =
-      await import("../services/assignment.service.server");
     const assignmentId = formData.get("assignmentId") as string;
     const notes = formData.get("notes") as string;
 
@@ -142,7 +140,6 @@ export async function action({ request }: Route.ActionArgs) {
 
       return data({ success: true });
     } catch (error) {
-      const { handleError } = await import("../lib/errors.server");
       return handleError(error);
     }
   }
@@ -166,7 +163,6 @@ export async function action({ request }: Route.ActionArgs) {
       });
       return data({ success: true, message: "Request submitted successfully" });
     } catch (error) {
-      const { handleError } = await import("../lib/errors.server");
       return handleError(error);
     }
   }
@@ -201,7 +197,6 @@ export async function action({ request }: Route.ActionArgs) {
       });
       return data({ success: true, message: "Request updated successfully." });
     } catch (error) {
-      const { handleError } = await import("../lib/errors.server");
       return handleError(error);
     }
   }
@@ -229,7 +224,6 @@ export async function action({ request }: Route.ActionArgs) {
         message: "Request cancelled successfully.",
       });
     } catch (error) {
-      const { handleError } = await import("../lib/errors.server");
       return handleError(error);
     }
   }

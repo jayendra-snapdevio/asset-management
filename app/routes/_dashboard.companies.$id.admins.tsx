@@ -43,9 +43,7 @@ import {
   UserPlus,
   UserMinus,
   Shield,
-  User,
-  Mail,
-  Search,
+  User
 } from "lucide-react";
 import { PasswordToggleField } from "~/components/forms/password-input";
 import { SuccessMessage } from "~/components/ui/success-message";
